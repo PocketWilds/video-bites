@@ -31,36 +31,12 @@ class VideoAnalyzer:
     def __init__(self, filepath):
         self.filepath = filepath
     
-    def run_analysis(self, num_threads=1, scale_factor=1.0):
+    def run_analysis(self, scale_factor=1.0):
         frames_queue = queue.Queue()
-        raw_results = []
-        read_threads = []
-        proc_threads = []
+        frame_comparisons = []
 
         video = cv2.VideoCapture(self.filepath)
-        thread_one = threading.Thread(target=VideoAnalyzer._read_in_frame, args=(video,frames_queue, scale_factor))
-        thread_two = threading.Thread(target=VideoAnalyzer._read_in_frame, args=(video,frames_queue, scale_factor))
-        thread_one.start()
-        thread_two.start()
-        thread_one.join()
-        thread_two.join()
-        
-        """for i in range(num_threads):
-            new_thread = threading.Thread(target=VideoAnalyzer._read_in_frame, args=(video,frames_queue, scale_factor))
-            read_threads.append(new_thread)
-            new_thread.start()"""
-
-        for i in range(num_threads):
-            new_thread = threading.Thread(target=VideoAnalyzer._process_frame, args=(frames_queue, read_threads))
-            proc_threads.append(new_thread)
-            new_thread.start()
-
-        for thread in read_threads:
-            thread.join()
-        for thread in proc_threads:
-            thread.join()
-
-    def _read_in_frame(video, frames_queue, scale_factor):
+        next_available_trigger = 0
         while (True):
             read_result, frame = video.read()
             if read_result:
@@ -72,28 +48,47 @@ class VideoAnalyzer:
                 scaled_h = int(shape[0] * scale_factor)
                 scaled_w = int(shape[1] * scale_factor)
                 frame = cv2.resize(frame, dsize=(scaled_w, scaled_h), interpolation=cv2.INTER_CUBIC)
-                    
-                #name = "./data/frame" + str(current_frame) + '.png'
+                
+                if current_frame > 1.0:
+                    isnt_locked = current_frame > next_available_trigger
+                    mse_result = VideoAnalyzer.mse(frame, past_frame)
+                    ssim_result = VideoAnalyzer.ssim(frame, past_frame)
+                    has_new_msg = mse_result > 11000.0 and ssim_result < 0.55 and isnt_locked
+                    if(has_new_msg):
+                        next_available_trigger = current_frame + 19.0
+                    frame_comparisons.append((current_frame, mse_result, ssim_result, has_new_msg))
+                #name = "..video-bites-data/data/" + str(current_frame) + '.png'
                 #cv2.imwrite(name, scaledFrame)
+                past_frame = frame
 
-                frames_queue.put(frame)
                 print("adding frame #" + str(current_frame))
                 pass
             else:
                 break
-        return
-        
-    def _process_frame(frames_queue, read_threads):
-        while (True):
-            still_reading = any(t.is_alive() for t in read_threads)
-            if(still_reading):
-            #if(frames_queue.qsize() > 0 or still_reading):
-                """if current_frame > 0:
-                    mse_result = Test.mse(frame, past_frame)
-                    ssim_result = Test.ssim(frame, past_frame)
-                    frame_comparisons.append((current_frame, mse_result, ssim_result))"""
-                pass
-            else:
-                break
 
-        return
+        video.release()
+        cv2.destroyAllWindows()
+
+        writeFile ="./simplified-detection.txt"
+        file = open(writeFile, 'w')
+        frame_comparisons_str = ""
+        for tup_elem in frame_comparisons:
+            frame_comparisons_str += str(tup_elem[0]) + "\t" + str(tup_elem[1]) + "\t" + str(tup_elem[2]) + "\t" + str(tup_elem[3]) + "\n"
+        file.write(frame_comparisons_str)
+        file.close()
+
+       
+    def mse(imageA, imageB):
+        err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
+        err /= float(imageA.shape[0] * imageA.shape[1])
+        return err
+
+    def ssim(imageA, imageB):
+        ra, ga, ba = cv2.split(imageA)
+        rb, gb, bb = cv2.split(imageB)
+
+        ssim_score_r = structural_similarity(ra, rb)
+        ssim_score_g = structural_similarity(ga, gb)
+        ssim_score_b = structural_similarity(ba, bb)
+
+        return (ssim_score_r + ssim_score_g + ssim_score_b) / 3

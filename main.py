@@ -21,13 +21,13 @@ from video_analyzer import VideoAnalyzer
 
 if __name__ == "__main__":
     start_time = time.perf_counter()
-    target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
+    #target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
     #target_video_filepath = ("../video-bites-data/test_vod_short.mp4")
-    #target_video_filepath = ("../video-bites-data/test_vod_med.mp4")
+    target_video_filepath = ("../video-bites-data/test_vod_med.mp4")
     #target_video_filepath = ("../video-bites-data/test_vod_long.mp4")
 
     analyzer = VideoAnalyzer(filepath=target_video_filepath)
-    analyzer.run_analysis(num_threads=1)
+    analyzer.run_analysis()
     
 
 
