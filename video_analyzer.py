@@ -1,4 +1,4 @@
-
+import bisect
 import cv2
 import threading
 import queue
@@ -6,41 +6,86 @@ import numpy as np
 from skimage.metrics import structural_similarity
 from PIL import Image
 
-class FrameQueue:
-    def __init__(self):
-        self.frames = []
-        self.frame_counter
-        
-    def get_next_pair(self):
-        valid_pair = None
+class FrameSettings:
+    class Setting:
+        def __init__(self, range, origin, height, width):
+            self.start = range[0]
+            self.end = range[1]
+            self.origin = origin
+            self.height = height
+            self.width = width
 
-        return valid_pair
+        @property
+        def tgt_crop(self):
+            return (self.origin[0], self.origin[1], self.origin[0] + self.width, self.origin[1] + height)
 
-    def find_next_hole(self):
+    def __init__(self, limit):
+        self.limit = limit
+        self._keys = []
+        self._ranges = []
+        self._settings = {}
 
-        return
+    def add_setting(self, new_setting):
+        index = bisect.bisect_right(self._keys, new_setting.start)
+        self._keys.insert(index, new_setting.start)
+        self._ranges.insert(index, (new_setting.start, new_setting.end))        
+
+    def get_setting(self, frame_num):
+        index = bisect.bisect_right(self._keys, frame_num) - 1
+        if (index >= 0 and frame_num <= self._ranges[index][1]):
+            return self._ranges[index]
+        return None
+
+class TriggerScores:
+    def __init__(self, frame_window, last_frame_num):
+        self.frame_window = frame_window
+        self.limit = last_frame_num
+        self.scores = {}
     
-    def enqueue(self, to_enqueue):
-        pass
+    def _clamp(value, min, max):
+        return max(min(value, max), min)
 
-    def dequeue(self, to_dequeue):
-        pass
+    def add(self, frame_num):
+        
+        left_limit = int(max(frame_num - int(self.frame_window / 2), 0))
 
+        right_limit = int(min(frame_num + int(self.frame_window / 2), self.limit))
+        for i in range(left_limit,right_limit):
+            attempt = self.scores.get(i)
+            if (attempt == None):
+                self.scores[i] = 1
+            else:
+                self.scores[i] = attempt + 1
 
+    def get(self, frame_num):
+        if (frame_num > self.limit or frame_num < 0):
+            raise IndexError(f"\"{frame_num}\" is outside the range of this map")
+        attempt = self.scores.get(int(frame_num))
+        return attempt if attempt != None else 0
+
+#TODO: consider cutting out the inclusion of non-trigger frames with the implication of 0
 class VideoAnalyzer:
     def __init__(self, filepath):
         self.filepath = filepath
+        self._video = cv2.VideoCapture(self.filepath)
+
+    def __del__(self):
+        self._video.release()
+        cv2.destroyAllWindows()
     
-    def run_analysis(self, scale_factor=1.0):
+    def run_analysis(self):
+        raw_results, frame_count, fps = self._get_raw_video_analysis()
+        meta_results = self._get_meta_analysis(raw_results, frame_count, fps)
+
+    def _get_raw_video_analysis(self, scale_factor=1.0):
         frames_queue = queue.Queue()
         frame_comparisons = []
-
-        video = cv2.VideoCapture(self.filepath)
+        
         next_available_trigger = 0
         while (True):
-            read_result, frame = video.read()
+            read_result, frame = self._video.read()
             if read_result:
-                current_frame = video.get(cv2.CAP_PROP_POS_FRAMES)
+                current_frame = self._video.get(cv2.CAP_PROP_POS_FRAMES)
                 src_img = Image.fromarray(frame)
                 crop = src_img.crop((1638, 70, 1852, 570))
                 frame = np.asarray(crop)
@@ -66,18 +111,24 @@ class VideoAnalyzer:
             else:
                 break
 
-        video.release()
-        cv2.destroyAllWindows()
-
         writeFile ="./simplified-detection.txt"
         file = open(writeFile, 'w')
         frame_comparisons_str = ""
         for tup_elem in frame_comparisons:
-            frame_comparisons_str += str(tup_elem[0]) + "\t" + str(tup_elem[1]) + "\t" + str(tup_elem[2]) + "\t" + str(tup_elem[3]) + "\n"
-        file.write(frame_comparisons_str)
+            file.write(str(tup_elem[0]) + "\t" + str(tup_elem[1]) + "\t" + str(tup_elem[2]) + "\t" + str(tup_elem[3]) + "\n")
         file.close()
 
-       
+        return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
+
+    def _get_meta_analysis(self, raw_results, frame_count, fps):
+        trigger_points = list(filter(lambda x:x[3] == True, raw_results))
+        total_triggers = len(trigger_points)
+        vid_len_sec = frame_count / fps
+        trigger_per_sec = total_triggers / vid_len_sec
+
+        print(total_triggers)
+        pass       
+
     def mse(imageA, imageB):
         err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
         err /= float(imageA.shape[0] * imageA.shape[1])
