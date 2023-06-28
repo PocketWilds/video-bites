@@ -20,7 +20,7 @@ from video_analyzer import VideoAnalyzer
 
 
 if __name__ == "__main__":
-    test = Test()
+    #test = Test()
     #test.test()
     start_time = time.perf_counter()
     #target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
