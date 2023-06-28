@@ -64,8 +64,9 @@ class TriggerScores:
         return attempt if attempt != None else 0
 
 #TODO: consider cutting out the inclusion of non-trigger frames with the implication of 0
+#TODO: introduce possible error handling to manage uninitiated filepath
 class VideoAnalyzer:
-    def __init__(self, filepath):
+    def __init__(self, filepath=None):
         self.filepath = filepath
         self._video = cv2.VideoCapture(self.filepath)
 

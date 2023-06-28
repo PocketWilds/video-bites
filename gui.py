@@ -9,14 +9,14 @@ from video_analyzer import VideoAnalyzer
 class Gui:
 
     def __init__(self):
-        target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
+        #target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
         #target_video_filepath = ("../video-bites-data/test_vod_short.mp4")
         #target_video_filepath = ("../video-bites-data/test_vod_med.mp4")
         #$target_video_filepath = ("../video-bites-data/test_vod_long.mp4")
 
         self._update_frame = False
         self._current_frame = 0
-        self._analyzer = VideoAnalyzer(target_video_filepath)
+        self._analyzer = VideoAnalyzer()
         self._video = None
         self._slider = None
 
