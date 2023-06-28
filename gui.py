@@ -12,6 +12,7 @@ class Gui:
         self._update_frame = False
         self._current_frame = 0
         self._analyzer = VideoAnalyzer()
+
         self._video = None
         self._slider = None
 
@@ -25,27 +26,31 @@ class Gui:
         with dpg.texture_registry(show=False):
             dpg.add_raw_texture(width=width, height=height, default_value=data, id='vid-preview-bg')
 
-        with dpg.window(id='ModalNewTab', modal=True, width=425, height=200, no_resize=True,show=True):
+        with dpg.window(id='ModalNewTab', modal=True, width=515, height=200, no_resize=True,show=True):
             with dpg.group():
-                dpg.add_text(default_value="Specify number of seconds for running average time window.")
+                dpg.add_text(default_value='Specify number of seconds for running average time window.')
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id="NewTabHoursInput", width=150, min_value=0)
-                    dpg.add_text(default_value=" hours")
+                    dpg.add_input_int(id='NewTabHoursInput', width=150, min_value=0)
+                    dpg.add_text(default_value=' hours')
+                    dpg.add_spacer(width=6)
+                    dpg.add_text(id='HoursErrorText', default_value='', color=(255,0,0,255))
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id="NewTabMinutesInput", width=150, min_value=0, max_value=59)
-                    dpg.add_text(default_value=" minutes")
+                    dpg.add_input_int(id='NewTabMinutesInput', width=150, min_value=0, max_value=59)
+                    dpg.add_text(default_value=' minutes')
+                    dpg.add_text(id='MinutesErrorText', default_value='', color=(255,0,0,255))
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id="NewTabSecondsInput", width=150, min_value=0, max_value=59)
-                    dpg.add_text(default_value=" seconds")
+                    dpg.add_input_int(id='NewTabSecondsInput', width=150, min_value=0, max_value=59)
+                    dpg.add_text(default_value=' seconds')
+                    dpg.add_text(id='SecondsErrorText', default_value='', color=(255,0,0,255))
                 dpg.add_spacer(height=10)
                 with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=75)
-                    dpg.add_text(default_value="")
+                    dpg.add_spacer(width=100)
+                    dpg.add_text(id='NewTabGeneralErrorText', default_value='', color=(255,0,0,255))
+                dpg.add_spacer(height=10)
                 with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=225)
-                    dpg.add_button(width=70, label="Cancel", callback=Gui._cb_close_new_tab_modal)
-                    dpg.add_button(width=70, label="Confirm", callback=Gui._cb_confirm_new_tab_modal)
-
+                    dpg.add_spacer(width=325)
+                    dpg.add_button(width=70, label='Confirm', callback=Gui._cb_confirm_new_tab_modal, user_data={'ctr':self})
+                    dpg.add_button(width=70, label='Cancel', callback=Gui._cb_close_new_tab_modal)
 
         with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19)):
             with dpg.menu_bar(label='MainMenuBar'):
@@ -66,12 +71,12 @@ class Gui:
                                 
                     with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
                         with dpg.group(horizontal=True):
-                            dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,"ctr":self})
+                            dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
                             dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
                         
                         with dpg.child_window(id='VideoPreview', width=529, height=298, border=False):
                             dpg.add_image('vid-preview-bg')
-                        self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={"ctr":self})
+                        self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
                         pass
 
                 dpg.add_spacer(height=10)
@@ -132,11 +137,37 @@ class Gui:
         dpg.set_value('NewTabMinutesInput', 0)
         dpg.set_value('NewTabSecondsInput', 0)
 
-    def _cb_confirm_new_tab_modal(sender, app_data):
+    def _cb_confirm_new_tab_modal(sender, app_data, user_data):
+        analyzer = user_data['ctr']._analyzer
+        num_hours = dpg.get_value('NewTabHoursInput')
+        num_minutes = dpg.get_value('NewTabMinutesInput')
+        num_seconds = dpg.get_value('NewTabSecondsInput')
 
-        if(False):
-            pass #mess with the error label
+        input_is_valid = True
+
+        if(num_hours < 0):
+            dpg.set_value('HoursErrorText','Please enter a positive number.')
+            input_is_valid = False
         else:
+            dpg.set_value('HoursErrorText','')
+        if(num_minutes < 0 or num_minutes >= 60):
+            dpg.set_value('MinutesErrorText','Please enter a number between 0 and 59.')
+            input_is_valid = False
+        else:
+            dpg.set_value('MinutesErrorText','')
+        if(num_seconds < 0 or num_seconds >= 60):
+            dpg.set_value('SecondsErrorText','Please enter a number between 0 and 59.')
+            input_is_valid = False
+        else:
+            dpg.set_value('SecondsErrorText','')
+
+        if(num_hours == 0 and num_minutes == 0 and num_seconds == 0):
+            dpg.set_value('NewTabGeneralErrorText','Please enter a time amount above 0 seconds.')
+            input_is_valid = False
+        else:
+            dpg.set_value('NewTabGeneralErrorText','')
+
+        if(input_is_valid):
             pass #process the input data, create the new tab
             Gui._cb_close_new_tab_modal(sender, app_data)
 
@@ -156,7 +187,7 @@ class Gui:
             num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
             Gui._change_preview_frame(controller._video, 0)
             controller._current_frame = 0
-            dpg.add_slider_int(id='VideoPosSlider', parent='PreviewSection', min_value=0, max_value=num_frames - 1, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={"ctr":controller})
+            dpg.add_slider_int(id='VideoPosSlider', parent='PreviewSection', min_value=0, max_value=num_frames - 1, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':controller})
 
     def _cb_run_analysis(sender, app_data, user_data):
         pass
@@ -188,7 +219,6 @@ class Gui:
             dpg.add_image('current-frame-preview', id='FramePreviewImage', parent='VideoPreview', pos=(0,0))
         else:
             dpg.set_value('current-frame-preview', texture_data)
-
 
     def _cv2_frame_to_dpg_texture_array(frame):
         unrolled_array = []
