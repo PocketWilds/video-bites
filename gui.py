@@ -16,7 +16,7 @@ class Gui:
 
         self._update_frame = False
         self._current_frame = 0
-        self.model = VideoAnalyzer(target_video_filepath)
+        self._analyzer = VideoAnalyzer(target_video_filepath)
         self._video = None
         self._slider = None
 
@@ -88,7 +88,7 @@ class Gui:
                                 
                     with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
                         with dpg.group(horizontal=True):
-                            dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'model':self.model,"ctr":self})
+                            dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,"ctr":self})
                             dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
                         
                         with dpg.child_window(id='VideoPreview', width=529, height=298, border=False):
@@ -168,12 +168,12 @@ class Gui:
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
         filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
         if (filepath != None and filepath != ''):
-            model = user_data['model']
+            analyzer = user_data['analyzer']
             controller = user_data['ctr']
             if(controller._video != None):
                 controller._video.release()
             
-            model.tgt_filepath = filepath
+            analyzer.tgt_filepath = filepath
             dpg.set_value('TgtFilepath',filepath)
             dpg.delete_item('VideoPosSlider')
             controller._video = cv2.VideoCapture(filepath)
