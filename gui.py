@@ -124,10 +124,10 @@ class Gui:
         pass
 
     def _cb_click_new_tab_btn(sender, app_data):
-        dpg.configure_item('ModalNewTab', show=True, pos=(250,100))
+        dpg.configure_item('ModalNewTab', show=True, pos=(250, 100))
 
     def _cb_close_new_tab_modal(sender, app_data):
-        dpg.configure_item('ModalNewTab', show=False, pos=(250,100))
+        dpg.configure_item('ModalNewTab', show=False, pos=(250, 100))
         dpg.set_value('NewTabHoursInput', 0)
         dpg.set_value('NewTabMinutesInput', 0)
         dpg.set_value('NewTabSecondsInput', 0)
@@ -150,7 +150,7 @@ class Gui:
                 controller._video.release()
             
             analyzer.tgt_filepath = filepath
-            dpg.set_value('TgtFilepath',filepath)
+            dpg.set_value('TgtFilepath', filepath)
             dpg.delete_item('VideoPosSlider')
             controller._video = cv2.VideoCapture(filepath)
             num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
