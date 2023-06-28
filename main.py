@@ -20,6 +20,8 @@ from video_analyzer import VideoAnalyzer
 
 
 if __name__ == "__main__":
+    test = Test()
+    #test.test()
     start_time = time.perf_counter()
     #target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
     #target_video_filepath = ("../video-bites-data/test_vod_short.mp4")
@@ -55,6 +57,6 @@ if __name__ == "__main__":
     sr_m = str(int(sr / 60) % 60)
     sr_h = str(int(sr / 3600))
     #print("Length of video: " + rt_h + " hr "+rt_m+" min "+rt_s+" sec")
-    print("Software Runtime: " + sr_h + " hr "+sr_m+" min "+sr_s+" sec")
+    print("Software Runtime: " + sr_h + " hr " + sr_m + " min " + sr_s + " sec")
     #print("Perf speed: " + str(runtime_s / sr))
     #gui.test()
