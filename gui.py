@@ -27,23 +27,6 @@ class Gui:
 
         width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
-
-
-
-
-
-        """target_video_filepath = ("../video-bites-data/test_vod_extra_short.mp4")
-        video = cv2.VideoCapture(target_video_filepath)
-        video.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        frame = video.read()[1]
-        shape = frame.shape
-        scaled_h = int(shape[0] * 0.275)
-        scaled_w = int(shape[1] * 0.275)
-        frame = cv2.resize(frame, dsize=(scaled_w, scaled_h), interpolation=cv2.INTER_CUBIC)
-        mod_frame = Gui._cv2_frame_to_dpg_texture_array(frame)"""
-
-
-
         with dpg.texture_registry(show=False):
             dpg.add_raw_texture(width=width, height=height, default_value=data, id='vid-preview-bg')
 
@@ -113,13 +96,11 @@ class Gui:
 
         dpg.setup_dearpygui()
         dpg.show_viewport()
-        #dpg.start_dearpygui()
 
         while dpg.is_dearpygui_running():
             tmp = dpg.get_value('VideoPosSlider')
             if(self._update_frame == True):
                 self._refresh_preview_frame()
-            #if(self._current_frame != )
             dpg.render_dearpygui_frame()
 
 
@@ -196,16 +177,7 @@ class Gui:
 
     def _refresh_preview_frame(self):
         self._update_frame = False
-        #dpg.delete_item('current-preview-frame')
-        
         Gui._change_preview_frame(self._video, self._current_frame)
-        """with dpg.texture_registry():
-            width = frame.shape[1]
-            height = frame.shape[0]
-            texture_id = "frame-" + str(self._current_frame)
-            #dpg.add_raw_texture(width=width, height=height, default_value=texture_data, format=dpg.mvFormat_Float_rgb, id=texture_id)
-        #self._current_frame = 
-        dpg.add_image("PreviewFrame", parent='VideoPreview', id='current-preview-frame',pos=(0,0))"""
 
     def _change_preview_frame(video, frame_number):
         frame = Gui._get_video_preview_frame(video, frame_number)
