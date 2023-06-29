@@ -180,14 +180,14 @@ class Gui:
         start_frame = dpg.get_value('NewSettingStartInput')
         end_frame = dpg.get_value('NewSettingEndInput')
 
-        if (start_frame < 0):
-            dpg.set_value('StartErrorText','Please enter a positive number.')
+        if (start_frame < 1):
+            dpg.set_value('StartErrorText','Please enter a number greater than 0.')
             is_data_valid = False
         else:
             dpg.set_value('StartErrorText','')
 
-        if (end_frame < 0):
-            dpg.set_value('EndErrorText','Please enter a positive number.')
+        if (end_frame < 1):
+            dpg.set_value('EndErrorText','Please enter a number greater than 0.')
             is_data_valid = False
         else:
             dpg.set_value('EndErrorText','')
@@ -198,7 +198,6 @@ class Gui:
         for setting_range in setting_ranges:
             if (setting_range != prev_range
             and Gui._do_ranges_overlap((start_frame, end_frame), setting_range)):
-                #print(prev_range)
                 frame_overlap = True
                 relevant_range = setting_range
                 break
@@ -370,6 +369,7 @@ class Gui:
                 parent='PreviewSection',
                 min_value=1,
                 max_value=num_frames,
+                default_value=1,
                 width=580,
                 enabled=True,
                 callback=Gui._cb_frame_slider,
@@ -384,7 +384,7 @@ class Gui:
         pass
 
     def _get_video_preview_frame(video_capture, frame_number):
-        video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
         frame = video_capture.read()[1]
         shape = frame.shape
         scaled_h = int(shape[0] * 0.275)
