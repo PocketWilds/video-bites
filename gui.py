@@ -8,6 +8,7 @@ from video_analyzer import VideoAnalyzer
 import random
 
 #TODO Currently can't edit analysis result windows well.  Consider a system to update stored values when windows are deleted.  Perhaps new button inside window instead of close button?
+#TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
 
 class Gui:
 
@@ -121,7 +122,7 @@ class Gui:
 
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=766)
-                    dpg.add_button(label='Begin Analysis',callback=Gui._cb_run_analysis)
+                    dpg.add_button(label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self})
 
         dpg.set_primary_window('MainWindow', True)
 
@@ -197,7 +198,7 @@ class Gui:
         for setting_range in setting_ranges:
             if (setting_range != prev_range
             and Gui._do_ranges_overlap((start_frame, end_frame), setting_range)):
-                print(prev_range)
+                #print(prev_range)
                 frame_overlap = True
                 relevant_range = setting_range
                 break
@@ -297,7 +298,6 @@ class Gui:
         dpg.set_value('SecondsErrorText', '')
         dpg.set_value('NewTabGeneralErrorText', '')
 
-
     def _cb_confirm_new_tab_modal(sender, app_data, user_data):
         analyzer = user_data['ctr']._analyzer
         num_hours = dpg.get_value('NewTabHoursInput')
@@ -305,7 +305,6 @@ class Gui:
         num_seconds = dpg.get_value('NewTabSecondsInput')
         title_str = f"{num_hours:02}h{num_minutes:02}m{num_seconds:02}s"
         total_seconds = num_seconds + num_minutes * 60 + num_hours * 3600
-
 
         input_is_valid = True
 
@@ -359,16 +358,29 @@ class Gui:
             if(controller._video != None):
                 controller._video.release()
             
-            analyzer.tgt_filepath = filepath
+            analyzer.set_filepath(filepath)
             dpg.set_value('TgtFilepath', filepath)
             dpg.delete_item('VideoPosSlider')
             controller._video = cv2.VideoCapture(filepath)
             num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
             Gui._change_preview_frame(controller._video, 0)
             controller._current_frame = 0
-            dpg.add_slider_int(id='VideoPosSlider', parent='PreviewSection', min_value=0, max_value=num_frames - 1, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':controller})
+            dpg.add_slider_int(
+                id='VideoPosSlider',
+                parent='PreviewSection',
+                min_value=0,
+                max_value=num_frames - 1,
+                width=580,
+                enabled=True,
+                callback=Gui._cb_frame_slider,
+                user_data={'ctr':controller}
+            )
 
+    #TODO enforce checks that frame ranges and average windows have been set
     def _cb_run_analysis(sender, app_data, user_data):
+        frame_ranges = user_data['ctr']._setting_ranges
+        running_average_windows = user_data['ctr']._target_windows
+        user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
         pass
 
     def _get_video_preview_frame(video_capture, frame_number):
