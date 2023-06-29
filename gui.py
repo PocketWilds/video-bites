@@ -5,6 +5,9 @@ import numpy as np
 from tkinter import filedialog
 from video_analyzer import VideoAnalyzer
 
+import random
+
+#TODO Currently can't edit analysis result windows well.  Consider a system to update stored values when windows are deleted.  Perhaps new button inside window instead of close button?
 
 class Gui:
 
@@ -12,7 +15,8 @@ class Gui:
         self._update_frame = False
         self._current_frame = 0
         self._analyzer = VideoAnalyzer()
-
+        self._target_windows = []
+        self._setting_ranges = []
         self._video = None
         self._slider = None
 
@@ -24,22 +28,49 @@ class Gui:
         width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
         with dpg.texture_registry(show=False):
+            width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
             dpg.add_raw_texture(width=width, height=height, default_value=data, id='vid-preview-bg')
-
-        with dpg.window(id='ModalNewTab', modal=True, width=515, height=200, no_resize=True,show=True):
+            width, height, channels, data = dpg.load_image('./results-bg.png')
+            dpg.add_raw_texture(width=width, height=height, default_value=data, id='results-bg')
+            
+        with dpg.window(id='ModalNewSetting', modal=True, width=515, height=200, no_resize=True,show=False):
             with dpg.group():
                 dpg.add_text(default_value='Specify number of seconds for running average time window.')
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id='NewTabHoursInput', width=150, min_value=0)
+                    dpg.add_text(default_value='Starting Frame:')
+                    dpg.add_input_int(id='NewSettingStartInput', width=100, min_value=0)
+                    dpg.add_spacer(width=6)
+                    dpg.add_text(id='StartErrorText', default_value='', color=(255,0,0,255))
+                with dpg.group(horizontal=True):
+                    dpg.add_text(default_value='Ending Frame:')
+                    dpg.add_spacer(width=6)
+                    dpg.add_input_int(id='NewSettingEndInput', width=100, min_value=0, max_value=59)
+                    dpg.add_spacer(width=6)
+                    dpg.add_text(id='EndErrorText', default_value='', color=(255,0,0,255))
+                dpg.add_spacer(height=10)
+                with dpg.group(horizontal=True):
+                    dpg.add_spacer(width=100)
+                    dpg.add_text(id='NewSettingGeneralErrorText', default_value='', color=(255,0,0,255))
+                dpg.add_spacer(height=10)
+                with dpg.group(horizontal=True):
+                    dpg.add_spacer(width=325)
+                    dpg.add_button(id='NewSettingConfirmBtn', width=70, label='Confirm', callback=Gui._cb_confirm_new_setting_modal, user_data={'ctr':self})
+                    dpg.add_button(width=70, label='Cancel', callback=Gui._cb_close_new_setting_modal, user_data={'ctr':self})
+
+        with dpg.window(id='ModalNewTab', modal=True, width=515, height=200, no_resize=True, show=False):
+            with dpg.group():
+                dpg.add_text(default_value='Specify number of seconds for running average time window.')
+                with dpg.group(horizontal=True):
+                    dpg.add_input_int(id='NewTabHoursInput', width=100, min_value=0)
                     dpg.add_text(default_value=' hours')
                     dpg.add_spacer(width=6)
                     dpg.add_text(id='HoursErrorText', default_value='', color=(255,0,0,255))
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id='NewTabMinutesInput', width=150, min_value=0, max_value=59)
+                    dpg.add_input_int(id='NewTabMinutesInput', width=100, min_value=0, max_value=59)
                     dpg.add_text(default_value=' minutes')
                     dpg.add_text(id='MinutesErrorText', default_value='', color=(255,0,0,255))
                 with dpg.group(horizontal=True):
-                    dpg.add_input_int(id='NewTabSecondsInput', width=150, min_value=0, max_value=59)
+                    dpg.add_input_int(id='NewTabSecondsInput', width=100, min_value=0, max_value=59)
                     dpg.add_text(default_value=' seconds')
                     dpg.add_text(id='SecondsErrorText', default_value='', color=(255,0,0,255))
                 dpg.add_spacer(height=10)
@@ -65,8 +96,8 @@ class Gui:
                         with dpg.group(horizontal=True):
                             dpg.add_spacer(width=5)
                             dpg.add_text(id='AnalysisSettingsLabel', default_value='Analysis Settings')
-                            dpg.add_button(id='NewSettingBtn', callback=Gui. _cb_add_setting, label='+')
-                        with dpg.child_window(label='SettingsContainer', width=(230), height=(320), pos=(5, 30), no_scrollbar=False):
+                            dpg.add_button(id='NewSettingBtn', callback=Gui._cb_add_setting, user_data={'ctr':self},label='+')
+                        with dpg.child_window(id='SettingsContainer', width=(230), height=(320), pos=(5, 30), no_scrollbar=False):
                             pass
                                 
                     with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
@@ -82,11 +113,11 @@ class Gui:
                 dpg.add_spacer(height=10)
 
                 with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
-                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True):
+                    
+                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_test):
+                        dpg.add_tab(id='BaseTab', show=False)
                         dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn)
-                    with dpg.child_window(id='ResultDisplayWindow', width=(860), height=(155), pos=(10, 35), horizontal_scrollbar=True, no_scrollbar=False, border=False):
-                        dpg.add_simple_plot(default_value=(0.3,0.9,2.5,8.9),height=125, width = 700)
-                        pass
+                    dpg.add_image('results-bg',pos=(7,30))
 
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=766)
@@ -119,13 +150,110 @@ class Gui:
         print('exit')
         pass
     
+    def _cb_test(sender, app_data):
+        print('test callback called')
+
     def _cb_frame_slider(sender, app_data, user_data):
         controller = user_data['ctr']
         if(controller._video != None):
             controller._current_frame = app_data
             controller._update_frame = True
 
-    def _cb_add_setting(sender, app_data):
+    def _cb_add_setting(sender, app_data, user_data):
+        edit_tgt = user_data.get('edit-tgt')
+        if(edit_tgt != None):
+            string = dpg.get_value(edit_tgt)
+            index = string.find('-')
+            start = int(string[:index])
+            end = int(string[index+1:])
+            dpg.set_value('NewSettingStartInput', start)
+            dpg.set_value('NewSettingEndInput', end)
+        dpg.configure_item('ModalNewSetting', show=True, pos=(250, 100), user_data=user_data)
+        dpg.configure_item('NewSettingConfirmBtn', user_data=user_data)
+
+    def _cb_confirm_new_setting_modal(sender, app_data, user_data):
+        is_data_valid = True
+        setting_ranges = user_data.get('ctr')._setting_ranges
+        edit_tgt = user_data.get('edit-tgt')
+        prev_range = user_data.get('range')
+        start_frame = dpg.get_value('NewSettingStartInput')
+        end_frame = dpg.get_value('NewSettingEndInput')
+
+        if (start_frame < 0):
+            dpg.set_value('StartErrorText','Please enter a positive number.')
+            is_data_valid = False
+        else:
+            dpg.set_value('StartErrorText','')
+
+        if (end_frame < 0):
+            dpg.set_value('EndErrorText','Please enter a positive number.')
+            is_data_valid = False
+        else:
+            dpg.set_value('EndErrorText','')
+
+        frame_overlap = False
+        relevant_range = None
+
+        for setting_range in setting_ranges:
+            if (setting_range != prev_range
+            and Gui._do_ranges_overlap((start_frame, end_frame), setting_range)):
+                print(prev_range)
+                frame_overlap = True
+                relevant_range = setting_range
+                break
+
+        if (is_data_valid and end_frame <= start_frame):
+            dpg.set_value('NewSettingGeneralErrorText','End value must be greater than Start value.')
+            is_data_valid = False
+        elif(frame_overlap):
+            dpg.set_value('NewSettingGeneralErrorText',f'Range overlaps with existing range ({relevant_range[0]}-{relevant_range[1]}).')
+            is_data_valid = False
+        else:
+            dpg.set_value('NewSettingGeneralErrorText','')
+
+        if(is_data_valid):
+            current_range = (start_frame,end_frame)
+            text = f"{start_frame}-{end_frame}"
+            if(edit_tgt == None):
+                with dpg.group(parent='SettingsContainer', horizontal=True):
+                    user_data['ctr']._setting_ranges.append((start_frame, end_frame))
+                    label = dpg.add_text(default_value=text)
+                    edit_btn= dpg.add_button()
+                    dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
+                        user_data={
+                            'ctr':user_data['ctr'],
+                            'edit-tgt':label,
+                            'range':current_range,
+                            'label':label,
+                            'edit-btn':edit_btn})
+                    dpg.add_button(label='Delete', callback=Gui._cb_delete_setting_button)
+            else:
+                setting_ranges.remove(prev_range)
+                setting_ranges.append(current_range)
+                label = user_data['label']
+                dpg.set_value(label, text)
+                edit_btn = user_data['edit-btn']
+                dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
+                        user_data={
+                            'ctr':user_data['ctr'],
+                            'edit-tgt':label,
+                            'range':(start_frame,end_frame),
+                            'label':label,
+                            'edit-btn':edit_btn})
+                
+                
+            Gui._cb_close_new_setting_modal(sender, app_data, user_data)
+        
+    def _cb_close_new_setting_modal(sender, app_data, user_data):
+        dpg.configure_item('ModalNewSetting', show=False, pos=(250, 100), user_data=user_data)
+        dpg.configure_item('NewSettingConfirmBtn', user_data=user_data)
+        dpg.set_value('NewSettingStartInput', 0)
+        dpg.set_value('NewSettingEndInput', 0)
+        dpg.set_value('StartErrorText','')
+        dpg.set_value('EndErrorText','')
+        dpg.set_value('NewSettingGeneralErrorText','')
+
+    def _cb_delete_setting_button(sender, app_data, user_data):
         pass
 
     def _cb_click_new_tab_btn(sender, app_data):
@@ -136,12 +264,20 @@ class Gui:
         dpg.set_value('NewTabHoursInput', 0)
         dpg.set_value('NewTabMinutesInput', 0)
         dpg.set_value('NewTabSecondsInput', 0)
+        dpg.set_value('HoursErrorText', '')
+        dpg.set_value('MinutesErrorText', '')
+        dpg.set_value('SecondsErrorText', '')
+        dpg.set_value('NewTabGeneralErrorText', '')
+
 
     def _cb_confirm_new_tab_modal(sender, app_data, user_data):
         analyzer = user_data['ctr']._analyzer
         num_hours = dpg.get_value('NewTabHoursInput')
         num_minutes = dpg.get_value('NewTabMinutesInput')
         num_seconds = dpg.get_value('NewTabSecondsInput')
+        title_str = f"{num_hours:02}h{num_minutes:02}m{num_seconds:02}s"
+        total_seconds = num_seconds + num_minutes * 60 + num_hours * 3600
+
 
         input_is_valid = True
 
@@ -167,9 +303,24 @@ class Gui:
         else:
             dpg.set_value('NewTabGeneralErrorText','')
 
+        if(total_seconds in user_data['ctr']._target_windows):
+            dpg.set_value('NewTabGeneralErrorText','Tab already exists for this amount.')
+            input_is_valid = False
+        elif(input_is_valid == True):
+            dpg.set_value('NewTabGeneralErrorText','')
+
         if(input_is_valid):
-            pass #process the input data, create the new tab
+            user_data['ctr']._target_windows.append(total_seconds)
+            new_tab_alias = 'tab' + title_str
+            with dpg.tab(id=new_tab_alias, parent='ResultsTabBar', label=title_str, closable=True):
+                #"""with dpg.achild_window(id='ResultDisplayWindow', width=(860), height=(155), pos=(10, 35), horizontal_scrollbar=True, no_scrollbar=False, border=False):
+                #dpg.add_simple_plot(default_value=([random.random()*10,random.random()*10]),height=125, width = 700, parent=new_tab_alias)
+                dpg.add_simple_plot(parent=new_tab_alias)
+
             Gui._cb_close_new_tab_modal(sender, app_data)
+
+    def _cb_exit_tab(sender, app_data, user_data):
+        pass
 
     def _cb_choose_src_vid(sender, app_data, user_data):
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
@@ -231,3 +382,10 @@ class Gui:
         texture = np.true_divide(texture, 255.0)
 
         return texture
+
+    def _do_ranges_overlap(left, right):
+        if(right[0] < left[0] < right[1]
+            or right[0] < left[1] < right[1]
+            or left[0] < right[1] < left[1]):
+            return True
+        return False

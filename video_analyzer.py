@@ -68,13 +68,20 @@ class TriggerScores:
 class VideoAnalyzer:
     def __init__(self, filepath=None):
         self.filepath = filepath
-        self._video = cv2.VideoCapture(self.filepath)
+        self._video = None
 
     def __del__(self):
-        self._video.release()
-        cv2.destroyAllWindows()
+        if(self._video != None):
+            self._video.release()
+            cv2.destroyAllWindows()
     
+    def set_filepath(self, filepath):
+        self.filepath = filepath
+        self._video = cv2.VideoCapture(self.filepath)
+
     def run_analysis(self):
+        if(self._video == None and self.filepath != None):
+            self._video = cv2.VideoCapture(self.filepath)
         raw_results, frame_count, fps = self._get_raw_video_analysis()
         meta_results = self._get_meta_analysis(raw_results, frame_count, fps)
 
