@@ -368,8 +368,8 @@ class Gui:
             dpg.add_slider_int(
                 id='VideoPosSlider',
                 parent='PreviewSection',
-                min_value=0,
-                max_value=num_frames - 1,
+                min_value=1,
+                max_value=num_frames,
                 width=580,
                 enabled=True,
                 callback=Gui._cb_frame_slider,
