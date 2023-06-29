@@ -84,7 +84,6 @@ class VideoAnalyzer:
             self._video = cv2.VideoCapture(self.filepath)
         
         raw_results, frame_count, fps = self._get_raw_video_analysis(frame_ranges)
-        print(frame_count)
         meta_results = self._get_meta_analysis(raw_results, frame_count, fps)
 
     def _get_raw_video_analysis(self, frame_ranges, scale_factor=1.0, monitored_section=(1638, 70, 1852, 570)):
@@ -136,9 +135,7 @@ class VideoAnalyzer:
         trigger_points = list(filter(lambda x:x[3] == True, raw_results))
         total_triggers = len(trigger_points)
         vid_len_sec = frame_count / fps
-        trigger_per_sec = total_triggers / vid_len_sec
-        print(len(trigger_points))
-        pass       
+        trigger_per_sec = total_triggers / vid_len_sec  
 
     def mse(imageA, imageB):
         err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
