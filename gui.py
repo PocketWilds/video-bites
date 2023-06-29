@@ -218,28 +218,49 @@ class Gui:
                 with dpg.group(parent='SettingsContainer', horizontal=True):
                     user_data['ctr']._setting_ranges.append((start_frame, end_frame))
                     label = dpg.add_text(default_value=text)
-                    edit_btn= dpg.add_button()
+                    edit_btn = dpg.add_button()
+                    del_btn = dpg.add_button()
                     dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
                         user_data={
                             'ctr':user_data['ctr'],
                             'edit-tgt':label,
                             'range':current_range,
                             'label':label,
-                            'edit-btn':edit_btn})
-                    dpg.add_button(label='Delete', callback=Gui._cb_delete_setting_button)
+                            'edit-btn':edit_btn,
+                            'del-btn':del_btn
+                        }
+                    )
+                    dpg.configure_item(del_btn,label='Delete', callback=Gui._cb_delete_setting_button,
+                        user_data={
+                            'ctr':user_data['ctr'],
+                            'self':dpg.get_item_parent(label),
+                            'range':current_range
+                        }
+                    )
             else:
                 setting_ranges.remove(prev_range)
                 setting_ranges.append(current_range)
                 label = user_data['label']
                 dpg.set_value(label, text)
                 edit_btn = user_data['edit-btn']
+                del_btn = user_data['del-btn']
                 dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
-                        user_data={
-                            'ctr':user_data['ctr'],
-                            'edit-tgt':label,
-                            'range':(start_frame,end_frame),
-                            'label':label,
-                            'edit-btn':edit_btn})
+                    user_data={
+                        'ctr':user_data['ctr'],
+                        'edit-tgt':label,
+                        'range':current_range,
+                        'label':label,
+                        'edit-btn':edit_btn,
+                        'del-btn':del_btn
+                    }
+                )
+                dpg.configure_item(del_btn,label='Delete', callback=Gui._cb_delete_setting_button,
+                    user_data={
+                        'ctr':user_data['ctr'],
+                        'self':dpg.get_item_parent(label),
+                        'range':current_range
+                    }
+                )
                 
                 
             Gui._cb_close_new_setting_modal(sender, app_data, user_data)
@@ -254,6 +275,13 @@ class Gui:
         dpg.set_value('NewSettingGeneralErrorText','')
 
     def _cb_delete_setting_button(sender, app_data, user_data):
+        group = user_data['self']
+        children = dpg.get_item_children(group)[1]
+        current_range = user_data['range']
+        user_data['ctr']._setting_ranges.remove(current_range)
+        for child in children:
+            dpg.delete_item(child)
+        dpg.delete_item(group)
         pass
 
     def _cb_click_new_tab_btn(sender, app_data):
