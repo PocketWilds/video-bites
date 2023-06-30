@@ -120,6 +120,9 @@ class Gui:
                         #dpg.add_tab(id='BaseTab', show=False)
                         dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn)
                     #dpg.add_image('results-bg',pos=(7,30), )
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(id='ResultsDelBtn', label='Edit', callback=Gui._cb_test)
+                        dpg.add_button(id='ResultsEditBtn', label='Delete', callback=Gui._cb_del_window, user_data={'ctr':self})
                 dpg.add_spacer(height=3)
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=716, show=True)
@@ -154,8 +157,26 @@ class Gui:
         print('exit')
         pass
     
-    def _cb_test(sender, app_data):
-        print('test callback called')
+    def _cb_test(sender, app_data, user_data):
+        pass
+
+    def _cb_del_window(sender, app_data, user_data):
+        title = dpg.get_value('ResultsTabBar')
+        print(title)
+        children = dpg.get_item_children(title)[1]
+        for child in children:
+            dpg.delete_item(child)
+        dpg.delete_item(title)
+        bound_data = user_data['ctr']._data_bindings[title]
+        print(f'bound data:{bound_data}')
+        user_data['ctr']._target_windows.remove(bound_data)
+        test = {}
+        user_data['ctr']._data_bindings.pop(title)
+        #value = dpg.get_value(108)
+        #dpg.delete_item
+        print(children)
+        dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+
 
     def _cb_frame_slider(sender, app_data, user_data):
         controller = user_data['ctr']
@@ -342,12 +363,11 @@ class Gui:
         if(input_is_valid):
             user_data['ctr']._target_windows.append(total_seconds)
             new_tab_alias = 'tab-' + title_str
-            with dpg.tab(id=new_tab_alias, parent='ResultsTabBar', label=title_str, closable=True):
-                #"""with dpg.achild_window(id='ResultDisplayWindow', width=(860), height=(155), pos=(10, 35), horizontal_scrollbar=True, no_scrollbar=False, border=False):
-                #dpg.add_simple_plot(default_value=([random.random()*10,random.random()*10]),height=125, width = 700, parent=new_tab_alias)
-                plot = dpg.add_simple_plot(parent=new_tab_alias, width=700, height=150)
-                user_data['ctr']._data_bindings[new_tab_alias+"-plot"] = plot
-
+            new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str, closable=True)
+            
+            plot = dpg.add_simple_plot(parent=new_tab, width=700, height=130)
+            user_data['ctr']._data_bindings[new_tab_alias+"-plot"] = plot
+            user_data['ctr']._data_bindings[new_tab] = total_seconds
             dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
             Gui._cb_close_new_tab_modal(sender, app_data)
 
@@ -357,7 +377,8 @@ class Gui:
     def _cb_choose_src_vid(sender, app_data, user_data):
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
         filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
-        if (filepath != None and filepath != ''):
+        
+        if (filepath != None and filepath != ()):
             analyzer = user_data['analyzer']
             controller = user_data['ctr']
             if(controller._video != None):

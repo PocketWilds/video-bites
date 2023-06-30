@@ -6,63 +6,6 @@ import numpy as np
 from skimage.metrics import structural_similarity
 from PIL import Image
 
-class FrameSettings:
-    class Setting:
-        def __init__(self, range, origin, height, width):
-            self.start = range[0]
-            self.end = range[1]
-            self.origin = origin
-            self.height = height
-            self.width = width
-
-        @property
-        def tgt_crop(self):
-            return (self.origin[0], self.origin[1], self.origin[0] + self.width, self.origin[1] + height)
-
-    def __init__(self, limit):
-        self.limit = limit
-        self._keys = []
-        self._ranges = []
-        self._settings = {}
-
-    def add_setting(self, new_setting):
-        index = bisect.bisect_right(self._keys, new_setting.start)
-        self._keys.insert(index, new_setting.start)
-        self._ranges.insert(index, (new_setting.start, new_setting.end))        
-
-    def get_setting(self, frame_num):
-        index = bisect.bisect_right(self._keys, frame_num) - 1
-        if (index >= 0 and frame_num <= self._ranges[index][1]):
-            return self._ranges[index]
-        return None
-
-class TriggerScores:
-    def __init__(self, frame_window, last_frame_num):
-        self.frame_window = frame_window
-        self.limit = last_frame_num
-        self.scores = {}
-    
-    def _clamp(value, min, max):
-        return max(min(value, max), min)
-
-    def add(self, frame_num):
-        
-        left_limit = int(max(frame_num - int(self.frame_window / 2), 0))
-
-        right_limit = int(min(frame_num + int(self.frame_window / 2), self.limit))
-        for i in range(left_limit,right_limit):
-            attempt = self.scores.get(i)
-            if (attempt == None):
-                self.scores[i] = 1
-            else:
-                self.scores[i] = attempt + 1
-
-    def get(self, frame_num):
-        if (frame_num > self.limit or frame_num < 0):
-            raise IndexError(f"\"{frame_num}\" is outside the range of this map")
-        attempt = self.scores.get(int(frame_num))
-        return attempt if attempt != None else 0
-
 #TODO: introduce possible error handling to manage uninitiated filepath
 class VideoAnalyzer:
     def __init__(self, filepath=None):

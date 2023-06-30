@@ -1,5 +1,4 @@
 from gui import Gui
-#from test import Test
 
 import cv2
 import os
