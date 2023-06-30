@@ -18,13 +18,14 @@ class Gui:
         self._analyzer = VideoAnalyzer()
         self._target_windows = []
         self._setting_ranges = []
+        self._data_bindings = {}
         self._video = None
         self._slider = None
 
         hasSaved = True
 
         self._context = dpg.create_context()
-        dpg.create_viewport(title='Video Bites', width=950, height=800, resizable = False)
+        dpg.create_viewport(title='Video Bites', width=900, height=650, resizable = False)
 
         width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
@@ -39,13 +40,13 @@ class Gui:
                 dpg.add_text(default_value='Specify number of seconds for running average time window.')
                 with dpg.group(horizontal=True):
                     dpg.add_text(default_value='Starting Frame:')
-                    dpg.add_input_int(id='NewSettingStartInput', width=100, min_value=0)
+                    dpg.add_input_int(id='NewSettingStartInput', width=100, min_value=0, default_value=1)
                     dpg.add_spacer(width=6)
                     dpg.add_text(id='StartErrorText', default_value='', color=(255,0,0,255))
                 with dpg.group(horizontal=True):
                     dpg.add_text(default_value='Ending Frame:')
                     dpg.add_spacer(width=6)
-                    dpg.add_input_int(id='NewSettingEndInput', width=100, min_value=0, max_value=59)
+                    dpg.add_input_int(id='NewSettingEndInput', width=100, min_value=0, max_value=59, default_value=1)
                     dpg.add_spacer(width=6)
                     dpg.add_text(id='EndErrorText', default_value='', color=(255,0,0,255))
                 dpg.add_spacer(height=10)
@@ -115,14 +116,16 @@ class Gui:
 
                 with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
                     
-                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_test):
-                        dpg.add_tab(id='BaseTab', show=False)
+                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True):
+                        #dpg.add_tab(id='BaseTab', show=False)
                         dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn)
-                    dpg.add_image('results-bg',pos=(7,30))
-
+                    #dpg.add_image('results-bg',pos=(7,30), )
+                dpg.add_spacer(height=3)
                 with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=766)
-                    dpg.add_button(label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self})
+                    dpg.add_spacer(width=716, show=True)
+                    with dpg.group():
+                        dpg.add_button(id='RunAnalysisBtn', label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self}, enabled=False)
+                    dpg.add_loading_indicator(id='LoadingIcon', style=1, radius=1.8, show=False)
 
         dpg.set_primary_window('MainWindow', True)
 
@@ -262,14 +265,15 @@ class Gui:
                     }
                 )
                 
-                
+            is_ready = Gui._check_analysis_prereqs(user_data['ctr'])
+            dpg.configure_item('RunAnalysisBtn', enabled=is_ready)
             Gui._cb_close_new_setting_modal(sender, app_data, user_data)
         
     def _cb_close_new_setting_modal(sender, app_data, user_data):
         dpg.configure_item('ModalNewSetting', show=False, pos=(250, 100), user_data=user_data)
         dpg.configure_item('NewSettingConfirmBtn', user_data=user_data)
-        dpg.set_value('NewSettingStartInput', 0)
-        dpg.set_value('NewSettingEndInput', 0)
+        dpg.set_value('NewSettingStartInput', 1)
+        dpg.set_value('NewSettingEndInput', 1)
         dpg.set_value('StartErrorText','')
         dpg.set_value('EndErrorText','')
         dpg.set_value('NewSettingGeneralErrorText','')
@@ -282,7 +286,7 @@ class Gui:
         for child in children:
             dpg.delete_item(child)
         dpg.delete_item(group)
-        pass
+        dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
 
     def _cb_click_new_tab_btn(sender, app_data):
         dpg.configure_item('ModalNewTab', show=True, pos=(250, 100))
@@ -337,12 +341,14 @@ class Gui:
 
         if(input_is_valid):
             user_data['ctr']._target_windows.append(total_seconds)
-            new_tab_alias = 'tab' + title_str
+            new_tab_alias = 'tab-' + title_str
             with dpg.tab(id=new_tab_alias, parent='ResultsTabBar', label=title_str, closable=True):
                 #"""with dpg.achild_window(id='ResultDisplayWindow', width=(860), height=(155), pos=(10, 35), horizontal_scrollbar=True, no_scrollbar=False, border=False):
                 #dpg.add_simple_plot(default_value=([random.random()*10,random.random()*10]),height=125, width = 700, parent=new_tab_alias)
-                dpg.add_simple_plot(parent=new_tab_alias)
+                plot = dpg.add_simple_plot(parent=new_tab_alias, width=700, height=150)
+                user_data['ctr']._data_bindings[new_tab_alias+"-plot"] = plot
 
+            dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
             Gui._cb_close_new_tab_modal(sender, app_data)
 
     def _cb_exit_tab(sender, app_data, user_data):
@@ -375,13 +381,17 @@ class Gui:
                 callback=Gui._cb_frame_slider,
                 user_data={'ctr':controller}
             )
+        dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
 
-    #TODO enforce checks that frame ranges and average windows have been set
     def _cb_run_analysis(sender, app_data, user_data):
+        dpg.configure_item('LoadingIcon',show=True)
         frame_ranges = user_data['ctr']._setting_ranges
         running_average_windows = user_data['ctr']._target_windows
-        user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
-        pass
+        results = user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
+        for i, window in enumerate(running_average_windows):
+            tab_plot = Gui._secs_to_tab_binding_title(window)
+            dpg.set_value(user_data['ctr']._data_bindings[tab_plot], results[i])
+        dpg.configure_item('LoadingIcon',show=False)  
 
     def _get_video_preview_frame(video_capture, frame_number):
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
@@ -429,3 +439,12 @@ class Gui:
             or left[0] < right[1] < left[1]):
             return True
         return False
+
+    def _secs_to_tab_binding_title(num_total_seconds):
+        num_seconds = int(num_total_seconds % 60)
+        num_minutes = int(num_total_seconds / 60 % 60)
+        num_hours = int(num_total_seconds / 3600)
+        return f'tab-{num_hours:02}h{num_minutes:02}m{num_seconds:02}s-plot'
+
+    def _check_analysis_prereqs(self):
+        return len(self._setting_ranges) > 0 and len(self._target_windows) > 0 and self._analyzer.is_initialized()

@@ -63,12 +63,14 @@ class TriggerScores:
         attempt = self.scores.get(int(frame_num))
         return attempt if attempt != None else 0
 
-#TODO: consider cutting out the inclusion of non-trigger frames with the implication of 0
 #TODO: introduce possible error handling to manage uninitiated filepath
 class VideoAnalyzer:
     def __init__(self, filepath=None):
         self.filepath = filepath
-        self._video = None
+        if(filepath == None):
+            self._video = None
+        else:
+            self.set_filepath(self.filepath)
 
     def __del__(self):
         if(self._video != None):
@@ -84,7 +86,8 @@ class VideoAnalyzer:
             self._video = cv2.VideoCapture(self.filepath)
         
         raw_results, frame_count, fps = self._get_raw_video_analysis(frame_ranges)
-        meta_results = self._get_meta_analysis(average_windows, raw_results, frame_count, fps)
+        meta_results = self._get_meta_analysis(average_windows, raw_results, int(frame_count), fps)
+        return meta_results
 
     def _get_raw_video_analysis(self, frame_ranges, scale_factor=1.0, monitored_section=(1638, 70, 1852, 570)):
         frame_comparisons = []
@@ -132,10 +135,37 @@ class VideoAnalyzer:
         return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
     
     def _get_meta_analysis(self, average_windows, raw_results, frame_count, fps):
-        trigger_points = list(filter(lambda x:x[3] == True, raw_results))
-        total_triggers = len(trigger_points)
+        meta_results = []
+        for window in average_windows:
+            meta_results.append({})
+
+        triggers = list(filter(lambda x:x[3] == True, raw_results))
+        total_triggers = len(triggers)
+
+        for trigger in triggers:
+            for i, window in enumerate(average_windows):
+                range_diff = int(fps * window / 2)
+                min_frame_range = max(int(trigger[0]) - range_diff, 1)
+                max_frame_range = min(int(trigger[0]) + range_diff, frame_count)
+                for j in range(min_frame_range, max_frame_range):
+                    if (meta_results[i].get(j) == None):
+                        meta_results[i][j] = 1.0
+                    else:
+                        meta_results[i][j] += 1.0
+
         vid_len_sec = frame_count / fps
-        trigger_per_sec = total_triggers / vid_len_sec  
+        trigger_per_sec = total_triggers / vid_len_sec
+        prepared_results = []
+        for results in meta_results:
+            new_result_set = []
+            for i in range(1, frame_count):
+                if (results.get(i) != None):
+                    new_result_set.append(results[i])
+                else:
+                    new_result_set.append(0.0)    
+            prepared_results.append(new_result_set)
+        
+        return prepared_results
 
     def mse(imageA, imageB):
         err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
@@ -149,5 +179,8 @@ class VideoAnalyzer:
         ssim_score_r = structural_similarity(ra, rb)
         ssim_score_g = structural_similarity(ga, gb)
         ssim_score_b = structural_similarity(ba, bb)
-
+        
         return (ssim_score_r + ssim_score_g + ssim_score_b) / 3
+
+    def is_initialized(self):
+        return self._video != None and self.filepath != None
