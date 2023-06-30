@@ -9,7 +9,7 @@ import random
 
 #TODO Currently can't edit analysis result windows well.  Consider a system to update stored values when windows are deleted.  Perhaps new button inside window instead of close button?
 #TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
-
+#TODO Consider a Filter system for applying similar actions (IE lock/unlock) to various elements on screen.  Possible flag implementation underneath for glue.
 class Gui:
 
     def __init__(self):
@@ -115,7 +115,7 @@ class Gui:
                 with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
                     
                     with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_switch_tabs, user_data={'ctr':self}):
-                        dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={})
+                        dpg.add_tab_button(id='NewTabBtn', label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={})
                     with dpg.group(horizontal=True):
                         dpg.add_button(id='ResultsEditBtn', enabled=False, label='Edit', callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
                         dpg.add_button(id='ResultsDelBtn', enabled=False, label='Delete', callback=Gui._cb_del_tab, user_data={'ctr':self})
@@ -380,6 +380,7 @@ class Gui:
         dpg.configure_item(title, show=False)
         children = dpg.get_item_children(title)[1]
         for child in children:
+            dpg.configure_item(child, show=False)
             dpg.delete_item(child)
         dpg.delete_item(title)
         bound_data = user_data['ctr']._data_bindings[title]
@@ -423,6 +424,10 @@ class Gui:
     def _cb_run_analysis(sender, app_data, user_data):
         dpg.configure_item('LoadingIcon',show=True)
         dpg.configure_item('RunAnalysisBtn', enabled=False)
+        dpg.configure_item('ResultsEditBtn', enabled=False)
+        dpg.configure_item('ResultsDelBtn', enabled=False)
+        dpg.configure_item('NewSettingBtn', enabled=False)
+        dpg.configure_item('SrcBtn', enabled=False)
         frame_ranges = user_data['ctr']._setting_ranges
         running_average_windows = user_data['ctr']._target_windows
         results = user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
@@ -443,6 +448,10 @@ class Gui:
             pass
         dpg.configure_item('LoadingIcon',show=False)
         dpg.configure_item('RunAnalysisBtn', enabled=True)
+        dpg.configure_item('ResultsEditBtn', enabled=True)
+        dpg.configure_item('ResultsDelBtn', enabled=True)
+        dpg.configure_item('NewSettingBtn', enabled=True)
+        dpg.configure_item('SrcBtn', enabled=True)
 
     def _get_video_preview_frame(video_capture, frame_number):
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
