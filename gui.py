@@ -101,7 +101,7 @@ class Gui:
                             dpg.add_button(id='NewSettingBtn', callback=Gui._cb_add_setting, user_data={'ctr':self},label='+')
                         with dpg.child_window(id='SettingsContainer', width=(230), height=(320), pos=(5, 30), no_scrollbar=False):
                             pass
-                                
+
                     with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
                         with dpg.group(horizontal=True):
                             dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
@@ -111,18 +111,14 @@ class Gui:
                             dpg.add_image('vid-preview-bg')
                         self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
                         pass
-
                 dpg.add_spacer(height=10)
-
                 with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
                     
-                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True):
-                        #dpg.add_tab(id='BaseTab', show=False)
-                        dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn)
-                    #dpg.add_image('results-bg',pos=(7,30), )
+                    with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_switch_tabs, user_data={'ctr':self}):
+                        dpg.add_tab_button(label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={})
                     with dpg.group(horizontal=True):
-                        dpg.add_button(id='ResultsDelBtn', label='Edit', callback=Gui._cb_test)
-                        dpg.add_button(id='ResultsEditBtn', label='Delete', callback=Gui._cb_del_window, user_data={'ctr':self})
+                        dpg.add_button(id='ResultsEditBtn', enabled=False, label='Edit', callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
+                        dpg.add_button(id='ResultsDelBtn', enabled=False, label='Delete', callback=Gui._cb_del_tab, user_data={'ctr':self})
                 dpg.add_spacer(height=3)
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=716, show=True)
@@ -160,22 +156,9 @@ class Gui:
     def _cb_test(sender, app_data, user_data):
         pass
 
-    def _cb_del_window(sender, app_data, user_data):
-        title = dpg.get_value('ResultsTabBar')
-        print(title)
-        children = dpg.get_item_children(title)[1]
-        for child in children:
-            dpg.delete_item(child)
-        dpg.delete_item(title)
-        bound_data = user_data['ctr']._data_bindings[title]
-        print(f'bound data:{bound_data}')
-        user_data['ctr']._target_windows.remove(bound_data)
-        test = {}
-        user_data['ctr']._data_bindings.pop(title)
-        #value = dpg.get_value(108)
-        #dpg.delete_item
-        print(children)
-        dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+    def _cb_switch_tabs(sender, app_data, user_data):
+        main_tab = dpg.get_value('ResultsTabBar')
+        dpg.configure_item('ResultsEditBtn', user_data = {'ctr':user_data['ctr'], 'edit-tgt':main_tab})
 
 
     def _cb_frame_slider(sender, app_data, user_data):
@@ -309,7 +292,14 @@ class Gui:
         dpg.delete_item(group)
         dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
 
-    def _cb_click_new_tab_btn(sender, app_data):
+    def _cb_click_new_tab_btn(sender, app_data, user_data):
+        edit_tgt = user_data.get('edit-tgt')
+        
+        if(edit_tgt != None):
+            num_total_seconds = user_data['ctr']._data_bindings.get(edit_tgt)
+            dpg.configure_item('NewTabHoursInput', default_value=int(num_total_seconds / 3600) % 60)
+            dpg.configure_item('NewTabMinutesInput', default_value=int(num_total_seconds / 60) % 60)
+            dpg.configure_item('NewTabSecondsInput', default_value=num_total_seconds % 60)
         dpg.configure_item('ModalNewTab', show=True, pos=(250, 100))
 
     def _cb_close_new_tab_modal(sender, app_data):
@@ -322,8 +312,14 @@ class Gui:
         dpg.set_value('SecondsErrorText', '')
         dpg.set_value('NewTabGeneralErrorText', '')
 
+    #TODO do a once through to clean up references and standardize data passing
     def _cb_confirm_new_tab_modal(sender, app_data, user_data):
+        edit_tgt = user_data.get('edit-tgt')
+        if(edit_tgt != None):
+            cur_time_val = user_data['ctr']._data_bindings[edit_tgt]
+        num_tabs = len(dpg.get_item_children('ResultsTabBar')[1]) - 1
         analyzer = user_data['ctr']._analyzer
+        
         num_hours = dpg.get_value('NewTabHoursInput')
         num_minutes = dpg.get_value('NewTabMinutesInput')
         num_seconds = dpg.get_value('NewTabSecondsInput')
@@ -361,18 +357,38 @@ class Gui:
             dpg.set_value('NewTabGeneralErrorText','')
 
         if(input_is_valid):
-            user_data['ctr']._target_windows.append(total_seconds)
-            new_tab_alias = 'tab-' + title_str
-            new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str, closable=True)
-            
-            plot = dpg.add_simple_plot(parent=new_tab, width=700, height=130)
-            user_data['ctr']._data_bindings[new_tab_alias+"-plot"] = plot
-            user_data['ctr']._data_bindings[new_tab] = total_seconds
-            dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+            if(edit_tgt == None):
+                user_data['ctr']._target_windows.append(total_seconds)
+                new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str)
+                plot = dpg.add_simple_plot(parent=new_tab, width=700, height=130)
+                #user_data['ctr']._data_bindings[new_tab] = plot
+                user_data['ctr']._data_bindings[new_tab] = total_seconds
+                dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+            else:
+                user_data['ctr']._target_windows.remove(cur_time_val)
+                user_data['ctr']._target_windows.append(total_seconds)
+                user_data['ctr']._data_bindings[edit_tgt] = total_seconds
+                dpg.configure_item(edit_tgt, label=title_str)
+            if(num_tabs == 0):
+                dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':user_data['ctr'], 'edit-tgt':new_tab})
+            dpg.configure_item('ResultsDelBtn', enabled=True)
             Gui._cb_close_new_tab_modal(sender, app_data)
 
-    def _cb_exit_tab(sender, app_data, user_data):
-        pass
+    def _cb_del_tab(sender, app_data, user_data):
+        num_tabs = len(dpg.get_item_children('ResultsTabBar')[1]) - 1
+        title = dpg.get_value('ResultsTabBar')
+        dpg.configure_item(title, show=False)
+        children = dpg.get_item_children(title)[1]
+        for child in children:
+            dpg.delete_item(child)
+        dpg.delete_item(title)
+        bound_data = user_data['ctr']._data_bindings[title]
+        user_data['ctr']._target_windows.remove(bound_data)
+        user_data['ctr']._data_bindings.pop(title)
+        dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+        if(num_tabs == 1):
+            dpg.configure_item('ResultsEditBtn', enabled=False, user_data={'ctr':user_data['ctr']})
+            dpg.configure_item('ResultsDelBtn', enabled=False)
 
     def _cb_choose_src_vid(sender, app_data, user_data):
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
@@ -406,13 +422,27 @@ class Gui:
 
     def _cb_run_analysis(sender, app_data, user_data):
         dpg.configure_item('LoadingIcon',show=True)
+        dpg.configure_item('RunAnalysisBtn', enabled=False)
         frame_ranges = user_data['ctr']._setting_ranges
         running_average_windows = user_data['ctr']._target_windows
         results = user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
-        for i, window in enumerate(running_average_windows):
-            tab_plot = Gui._secs_to_tab_binding_title(window)
-            dpg.set_value(user_data['ctr']._data_bindings[tab_plot], results[i])
-        dpg.configure_item('LoadingIcon',show=False)  
+
+        tabs = dpg.get_item_children('ResultsTabBar')[1]
+        #print(tabs)
+        for tab in tabs: #ignoring the bar's first child: the '+' button
+            tab_children = dpg.get_item_children(tab)[1]
+            if(len(tab_children) != 0):
+                plot = tab_children[0]
+                window_val = user_data['ctr']._data_bindings[tab]
+                #print(f'window_val: {window_val}')
+                #print(results)
+                dpg.set_value(plot, results[window_val])
+            #print(tab_children)
+            #tab_plot = Gui._secs_to_tab_binding_title(window)
+            
+            pass
+        dpg.configure_item('LoadingIcon',show=False)
+        dpg.configure_item('RunAnalysisBtn', enabled=True)
 
     def _get_video_preview_frame(video_capture, frame_number):
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)

@@ -78,35 +78,37 @@ class VideoAnalyzer:
         return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
     
     def _get_meta_analysis(self, average_windows, raw_results, frame_count, fps):
-        meta_results = []
+        meta_results = {}
         for window in average_windows:
-            meta_results.append({})
+            meta_results[window] = {}
 
         triggers = list(filter(lambda x:x[3] == True, raw_results))
         total_triggers = len(triggers)
 
         for trigger in triggers:
-            for i, window in enumerate(average_windows):
+            for window in average_windows:
                 range_diff = int(fps * window / 2)
                 min_frame_range = max(int(trigger[0]) - range_diff, 1)
                 max_frame_range = min(int(trigger[0]) + range_diff, frame_count)
-                for j in range(min_frame_range, max_frame_range):
-                    if (meta_results[i].get(j) == None):
-                        meta_results[i][j] = 1.0
+                for i in range(min_frame_range, max_frame_range):
+                    if (meta_results[window].get(i) == None):
+                        meta_results[window][i] = 1.0
                     else:
-                        meta_results[i][j] += 1.0
+                        meta_results[window][i] += 1.0
+
+        print(meta_results)
 
         vid_len_sec = frame_count / fps
         trigger_per_sec = total_triggers / vid_len_sec
-        prepared_results = []
-        for results in meta_results:
-            new_result_set = []
+        prepared_results = {}
+        for results_key in meta_results:
+            completed_set = []
             for i in range(1, frame_count):
-                if (results.get(i) != None):
-                    new_result_set.append(results[i])
+                if (meta_results[results_key].get(i) == None):
+                    completed_set.append(0.0)
                 else:
-                    new_result_set.append(0.0)    
-            prepared_results.append(new_result_set)
+                    completed_set.append(meta_results[results_key][i])
+            prepared_results[results_key] = completed_set
         
         return prepared_results
 
