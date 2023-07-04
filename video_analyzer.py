@@ -96,8 +96,6 @@ class VideoAnalyzer:
                     else:
                         meta_results[window][i] += 1.0
 
-        print(meta_results)
-
         vid_len_sec = frame_count / fps
         trigger_per_sec = total_triggers / vid_len_sec
         prepared_results = {}

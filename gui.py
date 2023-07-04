@@ -1,10 +1,11 @@
 import os
+import json
 import dearpygui.dearpygui as dpg
 import cv2
 import numpy as np
 from tkinter import filedialog
 from video_analyzer import VideoAnalyzer
-
+from config_report_file import SaveFile
 import random
 
 #TODO Currently can't edit analysis result windows well.  Consider a system to update stored values when windows are deleted.  Perhaps new button inside window instead of close button?
@@ -18,11 +19,14 @@ class Gui:
         self._analyzer = VideoAnalyzer()
         self._target_windows = []
         self._setting_ranges = []
+        self._report_results = {}
         self._data_bindings = {}
         self._video = None
         self._slider = None
-
-        hasSaved = True
+        self.save_file = None
+        self.has_saved = True
+        self.report_filename = None
+        self.exit = False
 
         self._context = dpg.create_context()
         dpg.create_viewport(title='Video Bites', width=900, height=650, resizable = False)
@@ -35,6 +39,16 @@ class Gui:
             width, height, channels, data = dpg.load_image('./results-bg.png')
             dpg.add_raw_texture(width=width, height=height, default_value=data, id='results-bg')
             
+        with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, no_resize=True,show=False):
+            dpg.add_text(default_value='You have not saved this report.  Do you wish to quit without saving?')
+            with dpg.group(horizontal=True):
+                dpg.add_spacer(width=138)
+                dpg.add_button(label='Save', callback=Gui._cb_save_and_quit, user_data={'ctr':self})
+                dpg.add_button(label='Dont\'t Save', callback=Gui._cb_exit, user_data={'ctr':self})
+                dpg.add_button(label='Cancel', callback=Gui._cb_cancel_exit, user_data={'ctr':self})
+
+
+
         with dpg.window(id='ModalNewSetting', modal=True, width=515, height=200, no_resize=True,show=False):
             with dpg.group():
                 dpg.add_text(default_value='Specify number of seconds for running average time window.')
@@ -88,10 +102,11 @@ class Gui:
         with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19)):
             with dpg.menu_bar(label='MainMenuBar'):
                 with dpg.menu(label='File'):
-                    dpg.add_menu_item(label='Open', callback=self.open)
-                    dpg.add_menu_item(label='Save', callback=self.save)
-                    dpg.add_menu_item(label='Save As...', callback=self.save)
-                    dpg.add_menu_item(label='Exit', callback=self.exit)
+                    #arg = self
+                    dpg.add_menu_item(label='Open', callback=Gui._cb_open, user_data={'ctr':self})
+                    dpg.add_menu_item(label='Save', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':False})
+                    dpg.add_menu_item(label='Save As...', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':True})
+                    dpg.add_menu_item(label='Exit', callback=Gui._cb_attempt_exit, user_data={'ctr':self, 'file-override':True})
             with dpg.group():
                 with dpg.group(horizontal=True):
                     with dpg.child_window(label='AnalysisSettings', width=(250), height=(350), border=False):
@@ -131,31 +146,75 @@ class Gui:
         dpg.setup_dearpygui()
         dpg.show_viewport()
 
-        while dpg.is_dearpygui_running():
+        while self.exit != True and dpg.is_dearpygui_running() :
             tmp = dpg.get_value('VideoPosSlider')
             if(self._update_frame == True):
                 self._refresh_preview_frame()
             dpg.render_dearpygui_frame()
 
-
         dpg.destroy_context()
         pass
 
-    def save(self):
-        print('save')
-        pass
+    def _cb_cancel_exit(sender, app_data, user_data):
+        dpg.configure_item('ModalConfirmExit', show=False)
 
-    def open(self):
-        print('open')
-        pass
+    def _cb_save_and_quit(sender, app_data, user_data):
+        save_success = Gui._cb_save(sender, app_data, user_data)
+        if(save_success == True):
+            Gui._cb_exit(sender, app_data, user_data)
+        else:
+            Gui._cb_cancel_exit(sender, app_data, user_data)
 
-    def exit(self):
-        print('exit')
-        pass
+    def _cb_exit(sender, app_data, user_data):
+        user_data['ctr'].exit = True
+
+    def _cb_save(sender, app_data, user_data):
+        controller = user_data['ctr']
+        if(controller.report_filename == None or user_data['file-override'] == True):
+            accepted_filetypes = [ ('Video Bites Report files', '*.g8r'), ('All files', '*.*')]
+            filepath = filedialog.asksaveasfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes, defaultextension='.g8r')
+        else:
+            filepath = controller.report_filename
+        if(filepath != None and filepath != ''):
+            file = open(filepath, 'w')
+            controller.report_filename = filepath
+            controller.has_saved = True
+
+            src_video_filepath = None
+            if(controller._analyzer.filepath != None):
+                src_video_filepath = controller._analyzer.filepath
+            save_file = SaveFile(src_video_filepath, controller._setting_ranges, controller._target_windows, controller._report_results)
+            
+            #print(save_file)
+            with file:
+                file.write(json.dumps(save_file.dump()))
+                #json.write(file, save_file)
+            #file.write(str(save_file))
+            file.close()
+            return True
+        else:
+            return False
     
-    def _cb_test(sender, app_data, user_data):
-        pass
+    def _cb_open(sender, app_data, user_data):
+        controller = user_data['ctr']
+        accepted_filetypes = [ ('Video Bites Report file', '*.g8r') ]
+        filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
+        if(filepath != None and filepath != ''):
+            
+            file = open(filepath)
+            data = json.load(file)
+            #print(data)
+            save_file = SaveFile(data['tgt_file'], data['frame_windows'], data['target_windows'], data['analysis_results'])
+            print(save_file)
 
+            controller.has_saved = True
+
+    def _cb_attempt_exit(sender, app_data, user_data):
+        if(user_data['ctr'].has_saved != True):
+            dpg.configure_item('ModalConfirmExit', show=True)
+        else:
+            Gui._cb_exit(sender, app_data, user_data)
+    
     def _cb_switch_tabs(sender, app_data, user_data):
         main_tab = dpg.get_value('ResultsTabBar')
         dpg.configure_item('ResultsEditBtn', user_data = {'ctr':user_data['ctr'], 'edit-tgt':main_tab})
@@ -178,8 +237,10 @@ class Gui:
             dpg.set_value('NewSettingEndInput', end)
         dpg.configure_item('ModalNewSetting', show=True, pos=(250, 100), user_data=user_data)
         dpg.configure_item('NewSettingConfirmBtn', user_data=user_data)
+        
 
     def _cb_confirm_new_setting_modal(sender, app_data, user_data):
+        controller = user_data['ctr']
         is_data_valid = True
         setting_ranges = user_data.get('ctr')._setting_ranges
         edit_tgt = user_data.get('edit-tgt')
@@ -272,6 +333,7 @@ class Gui:
             is_ready = Gui._check_analysis_prereqs(user_data['ctr'])
             dpg.configure_item('RunAnalysisBtn', enabled=is_ready)
             Gui._cb_close_new_setting_modal(sender, app_data, user_data)
+            controller.has_saved = False
         
     def _cb_close_new_setting_modal(sender, app_data, user_data):
         dpg.configure_item('ModalNewSetting', show=False, pos=(250, 100), user_data=user_data)
@@ -283,6 +345,7 @@ class Gui:
         dpg.set_value('NewSettingGeneralErrorText','')
 
     def _cb_delete_setting_button(sender, app_data, user_data):
+        controller = user_data['ctr']
         group = user_data['self']
         children = dpg.get_item_children(group)[1]
         current_range = user_data['range']
@@ -291,6 +354,7 @@ class Gui:
             dpg.delete_item(child)
         dpg.delete_item(group)
         dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+        controller.has_saved = False
 
     def _cb_click_new_tab_btn(sender, app_data, user_data):
         edit_tgt = user_data.get('edit-tgt')
@@ -357,6 +421,7 @@ class Gui:
             dpg.set_value('NewTabGeneralErrorText','')
 
         if(input_is_valid):
+            controller = user_data['ctr']
             if(edit_tgt == None):
                 user_data['ctr']._target_windows.append(total_seconds)
                 new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str)
@@ -373,6 +438,7 @@ class Gui:
                 dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':user_data['ctr'], 'edit-tgt':new_tab})
             dpg.configure_item('ResultsDelBtn', enabled=True)
             Gui._cb_close_new_tab_modal(sender, app_data)
+            controller.has_saved = False
 
     def _cb_del_tab(sender, app_data, user_data):
         num_tabs = len(dpg.get_item_children('ResultsTabBar')[1]) - 1
@@ -392,6 +458,7 @@ class Gui:
             dpg.configure_item('ResultsDelBtn', enabled=False)
 
     def _cb_choose_src_vid(sender, app_data, user_data):
+        controller = user_data['ctr']
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
         filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
         
@@ -420,8 +487,10 @@ class Gui:
                 user_data={'ctr':controller}
             )
         dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+        controller.has_saved = False
 
     def _cb_run_analysis(sender, app_data, user_data):
+        controller = user_data['ctr']
         dpg.configure_item('LoadingIcon',show=True)
         dpg.configure_item('RunAnalysisBtn', enabled=False)
         dpg.configure_item('ResultsEditBtn', enabled=False)
@@ -431,6 +500,8 @@ class Gui:
         frame_ranges = user_data['ctr']._setting_ranges
         running_average_windows = user_data['ctr']._target_windows
         results = user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
+        for result in results:
+            controller._report_results[result] = results[result]
 
         tabs = dpg.get_item_children('ResultsTabBar')[1]
         #print(tabs)
@@ -452,6 +523,7 @@ class Gui:
         dpg.configure_item('ResultsDelBtn', enabled=True)
         dpg.configure_item('NewSettingBtn', enabled=True)
         dpg.configure_item('SrcBtn', enabled=True)
+        controller.has_saved = False
 
     def _get_video_preview_frame(video_capture, frame_number):
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
