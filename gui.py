@@ -8,7 +8,7 @@ from video_analyzer import VideoAnalyzer
 from config_report_file import SaveFile
 import random
 
-#TODO Currently can't edit analysis result windows well.  Consider a system to update stored values when windows are deleted.  Perhaps new button inside window instead of close button?
+#TODO Probably ought to refactor this class to be a static, all things considered
 #TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
 #TODO Consider a Filter system for applying similar actions (IE lock/unlock) to various elements on screen.  Possible flag implementation underneath for glue.
 class Gui:
@@ -29,7 +29,7 @@ class Gui:
         self.exit = False
 
         self._context = dpg.create_context()
-        dpg.create_viewport(title='Video Bites', width=900, height=650, resizable = False)
+        dpg.create_viewport(title='Video Bites', width=900, height=700, resizable = False)
 
         width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
@@ -46,8 +46,6 @@ class Gui:
                 dpg.add_button(label='Save', callback=Gui._cb_save_and_quit, user_data={'ctr':self})
                 dpg.add_button(label='Dont\'t Save', callback=Gui._cb_exit, user_data={'ctr':self})
                 dpg.add_button(label='Cancel', callback=Gui._cb_cancel_exit, user_data={'ctr':self})
-
-
 
         with dpg.window(id='ModalNewSetting', modal=True, width=515, height=200, no_resize=True,show=False):
             with dpg.group():
@@ -96,13 +94,12 @@ class Gui:
                 dpg.add_spacer(height=10)
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=325)
-                    dpg.add_button(width=70, label='Confirm', callback=Gui._cb_confirm_new_tab_modal, user_data={'ctr':self})
+                    dpg.add_button(id='NewTabConfirmBtn', width=70, label='Confirm', callback=Gui._cb_confirm_new_tab_modal, user_data={'ctr':self})
                     dpg.add_button(width=70, label='Cancel', callback=Gui._cb_close_new_tab_modal)
 
-        with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19)):
+        with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19), no_close=True):
             with dpg.menu_bar(label='MainMenuBar'):
                 with dpg.menu(label='File'):
-                    #arg = self
                     dpg.add_menu_item(label='Open', callback=Gui._cb_open, user_data={'ctr':self})
                     dpg.add_menu_item(label='Save', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':False})
                     dpg.add_menu_item(label='Save As...', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':True})
@@ -125,12 +122,12 @@ class Gui:
                         with dpg.child_window(id='VideoPreview', width=529, height=298, border=False):
                             dpg.add_image('vid-preview-bg')
                         self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
-                        pass
+                        
                 dpg.add_spacer(height=10)
                 with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
                     
                     with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_switch_tabs, user_data={'ctr':self}):
-                        dpg.add_tab_button(id='NewTabBtn', label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={})
+                        dpg.add_tab_button(id='NewTabBtn', label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
                     with dpg.group(horizontal=True):
                         dpg.add_button(id='ResultsEditBtn', enabled=False, label='Edit', callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
                         dpg.add_button(id='ResultsDelBtn', enabled=False, label='Delete', callback=Gui._cb_del_tab, user_data={'ctr':self})
@@ -185,11 +182,8 @@ class Gui:
                 src_video_filepath = controller._analyzer.filepath
             save_file = SaveFile(src_video_filepath, controller._setting_ranges, controller._target_windows, controller._report_results)
             
-            #print(save_file)
             with file:
                 file.write(json.dumps(save_file.dump()))
-                #json.write(file, save_file)
-            #file.write(str(save_file))
             file.close()
             return True
         else:
@@ -198,17 +192,99 @@ class Gui:
     def _cb_open(sender, app_data, user_data):
         controller = user_data['ctr']
         accepted_filetypes = [ ('Video Bites Report file', '*.g8r') ]
-        filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
-        if(filepath != None and filepath != ''):
-            
-            file = open(filepath)
+        report_filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
+        
+        if(report_filepath != None and report_filepath != ''):
+            Gui._clear_fields(controller)
+            file = open(report_filepath)
             data = json.load(file)
-            #print(data)
-            save_file = SaveFile(data['tgt_file'], data['frame_windows'], data['target_windows'], data['analysis_results'])
-            print(save_file)
+            converted_tuples = []
+            for json_array in data['frame_windows']:
+                converted_tuples.append((json_array[0], json_array[1]))
+            save_file = SaveFile(data['src_file'], converted_tuples, data['target_windows'], data['analysis_results'])
 
+            for current_window in save_file.frame_windows:
+                start_frame = current_window[0]
+                end_frame = current_window[1]
+                text = f"{start_frame}-{end_frame}"
+                with dpg.group(parent='SettingsContainer', horizontal=True):
+                    controller._setting_ranges.append((start_frame, end_frame))
+                    label = dpg.add_text(default_value=text)
+                    edit_btn = dpg.add_button()
+                    del_btn = dpg.add_button()
+                    dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
+                        user_data={
+                            'ctr':user_data['ctr'],
+                            'edit-tgt':label,
+                            'range':current_window,
+                            'label':label,
+                            'edit-btn':edit_btn,
+                            'del-btn':del_btn
+                        }
+                    )
+                    dpg.configure_item(del_btn,label='Delete', callback=Gui._cb_delete_setting_button,
+                        user_data={
+                            'ctr':user_data['ctr'],
+                            'self':dpg.get_item_parent(label),
+                            'range':current_window
+                        }
+                    )
+            
+            for tgt_window in save_file.target_windows:
+                controller._target_windows.append(tgt_window)
+
+                num_seconds = int(tgt_window % 60)
+                num_minutes = int(tgt_window / 60 % 60)
+                num_hours = int(tgt_window / 3600)
+                
+                title_str = f"{num_hours:02}h{num_minutes:02}m{num_seconds:02}s"
+                new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str)
+                plot = dpg.add_simple_plot(parent=new_tab, width=700, height=130)
+                dpg.set_value(plot, save_file.analysis_results[str(tgt_window)])
+                user_data['ctr']._data_bindings[new_tab] = tgt_window
+                dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+                Gui._cb_close_new_tab_modal(sender, app_data)
+                controller.has_saved = False
+            tabs = dpg.get_item_children('ResultsTabBar')[1][1:]
+            if(len(tabs) > 0):
+                main_tab = tabs[0]
+            else:
+                main_tab = 0
+            if(main_tab != 0):
+                dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':user_data['ctr'], 'edit-tgt':main_tab})
+                dpg.configure_item('ResultsDelBtn', enabled=True)
             controller.has_saved = True
 
+            for key in save_file.analysis_results:
+                print(key)
+
+            src_filepath = data['src_file']
+        
+            if (src_filepath != None and src_filepath != ''):
+                analyzer = controller._analyzer
+                if(controller._video != None):
+                    controller._video.release()
+                
+                analyzer.set_filepath(src_filepath)
+                dpg.set_value('TgtFilepath', src_filepath)
+                dpg.delete_item('VideoPosSlider')
+                controller._video = cv2.VideoCapture(src_filepath)
+                num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
+                Gui._change_preview_frame(controller._video, 0)
+                controller._current_frame = 0
+                dpg.add_slider_int(
+                    id='VideoPosSlider',
+                    parent='PreviewSection',
+                    min_value=1,
+                    max_value=num_frames,
+                    default_value=1,
+                    width=580,
+                    enabled=True,
+                    callback=Gui._cb_frame_slider,
+                    user_data={'ctr':controller}
+                )
+            dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+            
     def _cb_attempt_exit(sender, app_data, user_data):
         if(user_data['ctr'].has_saved != True):
             dpg.configure_item('ModalConfirmExit', show=True)
@@ -218,7 +294,6 @@ class Gui:
     def _cb_switch_tabs(sender, app_data, user_data):
         main_tab = dpg.get_value('ResultsTabBar')
         dpg.configure_item('ResultsEditBtn', user_data = {'ctr':user_data['ctr'], 'edit-tgt':main_tab})
-
 
     def _cb_frame_slider(sender, app_data, user_data):
         controller = user_data['ctr']
@@ -238,7 +313,6 @@ class Gui:
         dpg.configure_item('ModalNewSetting', show=True, pos=(250, 100), user_data=user_data)
         dpg.configure_item('NewSettingConfirmBtn', user_data=user_data)
         
-
     def _cb_confirm_new_setting_modal(sender, app_data, user_data):
         controller = user_data['ctr']
         is_data_valid = True
@@ -357,14 +431,17 @@ class Gui:
         controller.has_saved = False
 
     def _cb_click_new_tab_btn(sender, app_data, user_data):
+        controller = user_data['ctr']
         edit_tgt = user_data.get('edit-tgt')
         
         if(edit_tgt != None):
-            num_total_seconds = user_data['ctr']._data_bindings.get(edit_tgt)
+            num_total_seconds = controller._data_bindings.get(edit_tgt)
             dpg.configure_item('NewTabHoursInput', default_value=int(num_total_seconds / 3600) % 60)
             dpg.configure_item('NewTabMinutesInput', default_value=int(num_total_seconds / 60) % 60)
-            dpg.configure_item('NewTabSecondsInput', default_value=num_total_seconds % 60)
+            dpg.configure_item('NewTabSecondsInput', default_value=num_total_seconds % 60)            
+            dpg.configure_item('NewTabConfirmBtn', user_data = {'ctr':controller, 'edit-tgt':edit_tgt})
         dpg.configure_item('ModalNewTab', show=True, pos=(250, 100))
+
 
     def _cb_close_new_tab_modal(sender, app_data):
         dpg.configure_item('ModalNewTab', show=False, pos=(250, 100))
@@ -378,11 +455,12 @@ class Gui:
 
     #TODO do a once through to clean up references and standardize data passing
     def _cb_confirm_new_tab_modal(sender, app_data, user_data):
+        controller = user_data['ctr']
         edit_tgt = user_data.get('edit-tgt')
         if(edit_tgt != None):
-            cur_time_val = user_data['ctr']._data_bindings[edit_tgt]
+            cur_time_val = controller._data_bindings[edit_tgt]
         num_tabs = len(dpg.get_item_children('ResultsTabBar')[1]) - 1
-        analyzer = user_data['ctr']._analyzer
+        analyzer = controller._analyzer
         
         num_hours = dpg.get_value('NewTabHoursInput')
         num_minutes = dpg.get_value('NewTabMinutesInput')
@@ -414,7 +492,7 @@ class Gui:
         else:
             dpg.set_value('NewTabGeneralErrorText','')
 
-        if(total_seconds in user_data['ctr']._target_windows):
+        if(total_seconds in user_data['ctr']._target_windows and total_seconds != cur_time_val ):
             dpg.set_value('NewTabGeneralErrorText','Tab already exists for this amount.')
             input_is_valid = False
         elif(input_is_valid == True):
@@ -423,21 +501,23 @@ class Gui:
         if(input_is_valid):
             controller = user_data['ctr']
             if(edit_tgt == None):
-                user_data['ctr']._target_windows.append(total_seconds)
+                controller._target_windows.append(total_seconds)
                 new_tab = dpg.add_tab(parent='ResultsTabBar', label=title_str)
                 plot = dpg.add_simple_plot(parent=new_tab, width=700, height=130)
                 #user_data['ctr']._data_bindings[new_tab] = plot
-                user_data['ctr']._data_bindings[new_tab] = total_seconds
+                controller._data_bindings[new_tab] = total_seconds
                 dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
             else:
-                user_data['ctr']._target_windows.remove(cur_time_val)
-                user_data['ctr']._target_windows.append(total_seconds)
-                user_data['ctr']._data_bindings[edit_tgt] = total_seconds
+                controller._target_windows.remove(cur_time_val)
+                controller._target_windows.append(total_seconds)
+                controller._data_bindings[edit_tgt] = total_seconds
                 dpg.configure_item(edit_tgt, label=title_str)
             if(num_tabs == 0):
-                dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':user_data['ctr'], 'edit-tgt':new_tab})
+                dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':controller, 'edit-tgt':new_tab})
             dpg.configure_item('ResultsDelBtn', enabled=True)
+            dpg.configure_item('NewTabConfirmBtn', user_data = {'ctr':controller})
             Gui._cb_close_new_tab_modal(sender, app_data)
+
             controller.has_saved = False
 
     def _cb_del_tab(sender, app_data, user_data):
@@ -462,7 +542,7 @@ class Gui:
         accepted_filetypes = [ ('MP4 video files', '*.mp4') ]
         filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
         
-        if (filepath != None and filepath != ()):
+        if (filepath != None and filepath != ''):
             analyzer = user_data['analyzer']
             controller = user_data['ctr']
             if(controller._video != None):
@@ -542,8 +622,6 @@ class Gui:
         frame = Gui._get_video_preview_frame(video, frame_number)
         texture_data = Gui._cv2_frame_to_dpg_texture_array(frame)
         
-        tmp = dpg.does_item_exist('FramePreviewImage')
-
         if(dpg.does_item_exist('FramePreviewImage') == False):
             with dpg.texture_registry(show=False):
                 width = frame.shape[1]
@@ -580,3 +658,34 @@ class Gui:
 
     def _check_analysis_prereqs(self):
         return len(self._setting_ranges) > 0 and len(self._target_windows) > 0 and self._analyzer.is_initialized()
+
+    def _clear_fields(gui):
+        gui._update_frame = False
+        gui._current_frame = 0
+        gui._analyzer = VideoAnalyzer()
+        gui._target_windows = []
+        gui._setting_ranges = []
+        gui._report_results = {}
+        gui._data_bindings = {}
+        gui._video = None
+        gui._slider = None
+        gui.save_file = None
+        gui.has_saved = True
+        gui.report_filename = None
+        gui.exit = False
+
+        settings = dpg.get_item_children('SettingsContainer')[1]
+        for setting in settings:
+            dpg.configure_item(setting, show=False)
+            dpg.delete_item(setting)
+        
+        tabs = dpg.get_item_children('ResultsTabBar')[1]
+        for tab in tabs[1:]:
+            dpg.configure_item(tab, show=False)
+            dpg.delete_item(tab)
+        dpg.delete_item('FramePreviewImage')
+        dpg.configure_item('VideoPosSlider', min_value=0, max_value=0, default_value=0)
+        dpg.configure_item('TgtFilepath', default_value='mp4 file not yet chosen')
+        dpg.configure_item('ResultsDelBtn', enabled=False)
+        dpg.configure_item('ResultsEditBtn', enabled=False)
+

@@ -1,0 +1,1 @@
+{"src_file": "D:/python/video-bites-data/test_vod_short.mp4", "frame_windows": [[1, 500], [1000, 3500]], "target_windows": [5, 30, 60], "analysis_results": {}}

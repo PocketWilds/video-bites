@@ -12,7 +12,7 @@ from skimage.io import imread
 
 from video_analyzer import VideoAnalyzer
 
-
+ 
 if __name__ == "__main__":
     start_time = time.perf_counter()
     gui = Gui()
