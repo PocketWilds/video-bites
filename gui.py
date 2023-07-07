@@ -21,6 +21,12 @@ class Gui:
         self._setting_ranges = []
         self._report_results = {}
         self._data_bindings = {}
+        self._total_x_data = []
+        self._total_y_data = []
+        self._boxed_x_data = []
+        self._boxed_y_data = []
+        self._scored_x_data = []
+        self._scored_y_data = []
         self._video = None
         self._slider = None
         self.save_file = None
@@ -29,7 +35,7 @@ class Gui:
         self.exit = False
 
         self._context = dpg.create_context()
-        dpg.create_viewport(title='Video Bites', width=900, height=700, resizable = False)
+        dpg.create_viewport(title='Video Bites', width=900, height=780, resizable = False)
 
         width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
@@ -124,19 +130,57 @@ class Gui:
                         self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=580,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
                         
                 dpg.add_spacer(height=10)
-                with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False):
+                with dpg.child_window(id='AnalysisResults', width=(880), height=(200), no_scrollbar=False, show=False):
                     
                     with dpg.tab_bar(id='ResultsTabBar', reorderable=True, callback=Gui._cb_switch_tabs, user_data={'ctr':self}):
                         dpg.add_tab_button(id='NewTabBtn', label='+', trailing=True, callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
                     with dpg.group(horizontal=True):
                         dpg.add_button(id='ResultsEditBtn', enabled=False, label='Edit', callback=Gui._cb_click_new_tab_btn, user_data={'ctr':self})
                         dpg.add_button(id='ResultsDelBtn', enabled=False, label='Delete', callback=Gui._cb_del_tab, user_data={'ctr':self})
+                
+                with dpg.child_window(id='ResultGraphs', width=880, height=270, no_scrollbar=False):
+                    with dpg.tab_bar(id='GraphTabBar', reorderable=False, user_data={'ctr':self}):
+                        
+                        with dpg.tab(id='TotalCommentTab', label='Total Comments'):
+                            with dpg.plot(tag='TotalPlot', label='Total Comments Over Time', width=750, height=230):
+                                dpg.add_plot_legend()
+                                dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisTotal', lock_min=True)
+                                dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisTotal', lock_min=True)
+                                dpg.add_line_series(self._total_x_data, self._total_y_data, label='Total Comments', parent='YAxisTotal', tag='TotalSeries')
+
+                        with dpg.tab(id='BoxedCommentTab', label='Grouped Comments'):
+                            with dpg.group(horizontal=True):
+                                with dpg.plot(tag='BoxedPlot', label='Comments per Window', width=750, height=230):
+                                    dpg.add_plot_legend()
+                                    dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisBoxed', lock_min=True)
+                                    dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisBoxed', lock_min=True)
+                                    dpg.add_bar_series(self._boxed_x_data, self._boxed_y_data, label='Comments in 10 Second Window', parent='YAxisBoxed', tag='BoxedSeries')
+                                dpg.add_input_int()
+
+                        with dpg.tab(id='ScoredCommentTab', label='Engagement Scores'):
+                            with dpg.group(horizontal=True):
+                                with dpg.plot(tag='ScoredPlot', label='Engagement Score Over Time', width=750, height=230):
+                                    dpg.add_plot_legend()
+                                    dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisScored', lock_min=True)
+                                    dpg.add_plot_axis(dpg.mvYAxis, label='Engagement Score', tag='YAxisScored', lock_min=True)
+                                    dpg.add_line_series(self._scored_x_data, self._scored_y_data, label='Engagement Score Over Time', parent='YAxisScored', tag='ScoredSeries')
+                                with dpg.group():
+                                    with dpg.group(horizontal=True):
+                                        dpg.add_input_float()
+                                    with dpg.group(horizontal=True):
+                                        dpg.add_input_float()
+
+
+
                 dpg.add_spacer(height=3)
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=716, show=True)
                     with dpg.group():
                         dpg.add_button(id='RunAnalysisBtn', label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self}, enabled=False)
                     dpg.add_loading_indicator(id='LoadingIcon', style=1, radius=1.8, show=False)
+
+                        
+
 
         dpg.set_primary_window('MainWindow', True)
 
@@ -254,9 +298,6 @@ class Gui:
                 dpg.configure_item('ResultsEditBtn', enabled=True, user_data = {'ctr':user_data['ctr'], 'edit-tgt':main_tab})
                 dpg.configure_item('ResultsDelBtn', enabled=True)
             controller.has_saved = True
-
-            for key in save_file.analysis_results:
-                print(key)
 
             src_filepath = data['src_file']
         
@@ -577,10 +618,11 @@ class Gui:
         dpg.configure_item('ResultsDelBtn', enabled=False)
         dpg.configure_item('NewSettingBtn', enabled=False)
         dpg.configure_item('SrcBtn', enabled=False)
-        frame_ranges = user_data['ctr']._setting_ranges
-        running_average_windows = user_data['ctr']._target_windows
-        results = user_data['ctr']._analyzer.run_analysis(frame_ranges, running_average_windows)
-        for result in results:
+        frame_ranges = controller._setting_ranges
+        running_average_windows = controller._target_windows
+        results, frame_count, fps = controller._analyzer.run_analysis(frame_ranges, running_average_windows)
+        controller._process_raw_results(results, frame_count, fps)
+        """for result in results:
             controller._report_results[result] = results[result]
 
         tabs = dpg.get_item_children('ResultsTabBar')[1]
@@ -596,7 +638,7 @@ class Gui:
             #print(tab_children)
             #tab_plot = Gui._secs_to_tab_binding_title(window)
             
-            pass
+            pass"""
         dpg.configure_item('LoadingIcon',show=False)
         dpg.configure_item('RunAnalysisBtn', enabled=True)
         dpg.configure_item('ResultsEditBtn', enabled=True)
@@ -604,6 +646,68 @@ class Gui:
         dpg.configure_item('NewSettingBtn', enabled=True)
         dpg.configure_item('SrcBtn', enabled=True)
         controller.has_saved = False
+
+        total_comments = 0
+
+    def _process_raw_results(self, raw_results, frame_count, fps, window_size = 300, point_score=2.0, point_decay_rate=0.002):
+        self._total_x_data = []
+        self._total_y_data = []
+        self._boxed_x_data = []
+        self._boxed_y_data = []
+        self._scored_x_data = []
+        self._scored_y_data = []
+        self._total_x_data.append(0)
+        self._total_y_data.append(0)
+        self._scored_x_data.append(0)
+        self._scored_y_data.append(0)
+
+        total_comments = 0
+        running_count = 0
+
+        aggregate_totals = {}
+        base = 0
+        while base < frame_count:
+            aggregate_totals[base] = 0
+            base += window_size
+        
+        frame_triggers = []
+        for result in raw_results:
+            frame_number = result[0]
+            flag = result[2]
+
+            if(flag == True):
+                frame_triggers.append(frame_number)
+                total_comments += 1
+                self._total_x_data.append(frame_number)
+                self._total_y_data.append(total_comments)
+                aggregate_key = (int (frame_number / window_size)) * window_size
+                aggregate_totals[aggregate_key] += 1
+
+        score = 0
+        for i in range(int(frame_count)):
+            score = max(score - point_decay_rate, 0)
+            if i in frame_triggers:
+                score += point_score
+            self._scored_x_data.append(i)
+            self._scored_y_data.append(score)
+
+        self._total_x_data.append(frame_count)
+        self._total_y_data.append(total_comments)
+        dpg.configure_item('TotalSeries', x=self._total_x_data, y=self._total_y_data)    
+        dpg.fit_axis_data('XAxisTotal')
+        dpg.fit_axis_data('YAxisTotal')
+
+        for x_val in aggregate_totals:
+            self._boxed_x_data.append(x_val + window_size / 2)
+            self._boxed_y_data.append(aggregate_totals[x_val])
+     
+        dpg.configure_item('BoxedSeries', x=self._boxed_x_data, y=self._boxed_y_data, label=f'Comments in {(window_size / fps):.2} Second Window', weight=window_size*0.95)
+        dpg.fit_axis_data('XAxisBoxed')
+        dpg.fit_axis_data('YAxisBoxed')
+
+        dpg.configure_item('ScoredSeries', x=self._scored_x_data, y=self._scored_y_data)
+        dpg.fit_axis_data('XAxisScored')
+        dpg.fit_axis_data('YAxisScored')
 
     def _get_video_preview_frame(video_capture, frame_number):
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)

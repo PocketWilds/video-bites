@@ -29,7 +29,7 @@ class VideoAnalyzer:
         
         raw_results, frame_count, fps = self._get_raw_video_analysis(frame_ranges)
         meta_results = self._get_meta_analysis(average_windows, raw_results, int(frame_count), fps)
-        return meta_results
+        return raw_results, frame_count, fps
 
     def _get_raw_video_analysis(self, frame_ranges, scale_factor=1.0, monitored_section=(1638, 70, 1852, 570)):
         frame_comparisons = []
@@ -37,11 +37,11 @@ class VideoAnalyzer:
         for frame_range in frame_ranges:
             self._video.set(cv2.CAP_PROP_POS_FRAMES, frame_range[0])
             past_frame = None
-            range_floor = frame_range[0] + 1
-            for i in range(frame_range[0], frame_range[1]):
+            range_floor = frame_range[0]
+            for i in range(frame_range[0] - 1, frame_range[1]):
                 read_result, frame = self._video.read()
                 if read_result:
-                    current_frame = self._video.get(cv2.CAP_PROP_POS_FRAMES)
+                    #current_frame = self._video.get(cv2.CAP_PROP_POS_FRAMES)
                     src_img = Image.fromarray(frame)
                     crop = src_img.crop(monitored_section)
                     frame = np.asarray(crop)
@@ -50,13 +50,13 @@ class VideoAnalyzer:
                     scaled_w = int(shape[1] * scale_factor)
                     frame = cv2.resize(frame, dsize=(scaled_w, scaled_h), interpolation=cv2.INTER_CUBIC)
                     
-                    if current_frame > range_floor:
-                        isnt_locked = current_frame > next_available_trigger
+                    if i > range_floor:
+                        isnt_locked = i > next_available_trigger
                         mse_result = VideoAnalyzer.mse(frame, past_frame)
                         has_new_msg = mse_result > 11000.0 and isnt_locked
                         if(has_new_msg):
-                            next_available_trigger = current_frame + 19.0
-                        frame_comparisons.append((current_frame, mse_result, has_new_msg))
+                            next_available_trigger = i + 19
+                        frame_comparisons.append((i, mse_result, has_new_msg))
                     #name = "..video-bites-data/data/" + str(current_frame) + '.png'
                     #cv2.imwrite(name, scaledFrame)
                     past_frame = frame
