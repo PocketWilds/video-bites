@@ -308,7 +308,6 @@ class Gui:
 
     def _cb_add_setting(sender, app_data, user_data):
         edit_tgt = user_data.get('edit-tgt')
-        print(edit_tgt)
         if(edit_tgt != None):
             string = dpg.get_value(edit_tgt)
             index = string.find('-')
