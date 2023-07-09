@@ -23,12 +23,12 @@ class VideoAnalyzer:
         self.filepath = filepath
         self._video = cv2.VideoCapture(self.filepath)
 
-    def run_analysis(self, frame_ranges, average_windows):
+    def run_analysis(self, frame_ranges):
         if(self._video != None and self.filepath != None):
             self._video = cv2.VideoCapture(self.filepath)
         
         raw_results, frame_count, fps = self._get_raw_video_analysis(frame_ranges)
-        meta_results = self._get_meta_analysis(average_windows, raw_results, int(frame_count), fps)
+        #meta_results = self._get_meta_analysis(average_windows, raw_results, int(frame_count), fps)
         return raw_results, frame_count, fps
 
     def _get_raw_video_analysis(self, frame_ranges, scale_factor=1.0, monitored_section=(1638, 70, 1852, 570)):
