@@ -59,6 +59,7 @@ class VideoAnalyzer:
                         has_new_msg = mse_result > 11000.0 and isnt_locked
                         if(has_new_msg):
                             next_available_trigger = i + 19
+                        frame_comparisons.append((i, mse_result, has_new_msg))
                     past_frame = frame
                 else:
                     break
@@ -71,7 +72,7 @@ class VideoAnalyzer:
         video_time_analyzed = analyzed_frame_count / fps
         performance_speed = video_time_analyzed / runtime
 
-        log_output = f"runtime: {runtime} seconds\nframes analyzed: {analyzed_frame_count} frames\nfps: {fps} fps\namount of video footage analyzed: {video_time_analyzed}\nperformance_speed: {performance_speed} seconds of video per second\n"
+        log_output = f'tgt file: {self.filepath}\nruntime: {runtime} seconds\nframes analyzed: {analyzed_frame_count} frames\nfps: {fps} fps\namount of video footage analyzed: {video_time_analyzed}\nperformance_speed: {performance_speed} seconds of video per second\n'
         for tup_elem in frame_comparisons:
             log_output += f'{tup_elem[0]}\t{tup_elem[1]}\t{tup_elem[2]}\n'
         LogManager.write_log(log_output)
