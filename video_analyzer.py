@@ -1,9 +1,7 @@
-#import bisect
 import cv2
-#import threading
-#import queue
 import numpy as np
 from PIL import Image
+
 from log_manager import LogManager
 
 #TODO: introduce possible error handling to manage uninitiated filepath
@@ -61,10 +59,10 @@ class VideoAnalyzer:
                 else:
                     break
         
-        frame_comparisons_str = ""
+        log_output = ""
         for tup_elem in frame_comparisons:
-            frame_comparisons_str += f'{tup_elem[0]}\t{tup_elem[1]}\t{tup_elem[2]}\n'
-        LogManager.write_log(frame_comparisons_str)
+            log_output += f'{tup_elem[0]}\t{tup_elem[1]}\t{tup_elem[2]}\n'
+        LogManager.write_log(log_output)
 
         return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
     
