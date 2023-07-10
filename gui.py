@@ -48,7 +48,7 @@ class Gui:
                         dpg.add_spacer(width=170)
                         dpg.add_button(id='ConfirmErrorButton', label='Ok', callback=Gui._cb_close_error_popup, user_data={'ctr':self})
 
-            with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, pos=(320,300), no_resize=True,show=False):
+            with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, pos=(170,300), no_resize=True,show=False):
                 dpg.add_text(default_value='You have not saved this report.  Do you wish to quit without saving?')
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=138)
