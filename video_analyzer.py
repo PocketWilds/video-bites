@@ -4,6 +4,7 @@ import cv2
 #import queue
 import numpy as np
 from PIL import Image
+from log_manager import LogManager
 
 #TODO: introduce possible error handling to manage uninitiated filepath
 class VideoAnalyzer:
@@ -55,21 +56,15 @@ class VideoAnalyzer:
                         if(has_new_msg):
                             next_available_trigger = i + 19
                         frame_comparisons.append((i, mse_result, has_new_msg))
-                    #name = "..video-bites-data/data/" + str(current_frame) + '.png'
                     #cv2.imwrite(name, scaledFrame)
                     past_frame = frame
-
-                    #print("adding frame #" + str(current_frame))
-                    pass
                 else:
                     break
-
-        writeFile ="./simplified-detection.txt"
-        file = open(writeFile, 'w')
+        
         frame_comparisons_str = ""
         for tup_elem in frame_comparisons:
-            file.write(str(tup_elem[0]) + "\t" + str(tup_elem[1]) + "\t" + str(tup_elem[2]) + "\n")
-        file.close()
+            frame_comparisons_str += f'{tup_elem[0]}\t{tup_elem[1]}\t{tup_elem[2]}\n'
+        LogManager.write_log(frame_comparisons_str)
 
         return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
     

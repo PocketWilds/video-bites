@@ -9,3 +9,5 @@ if __name__ == '__main__':
         gui = Gui()
     except Exception as e:
         LogManager.write_error_log(e)
+    except SystemError as e:
+        LogManager.write_error_log(e)

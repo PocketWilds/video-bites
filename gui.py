@@ -4,7 +4,9 @@ import dearpygui.dearpygui as dpg
 import cv2
 import numpy as np
 from tkinter import filedialog
+
 from video_analyzer import VideoAnalyzer
+from log_manager import LogManager
 
 #TODO Probably ought to refactor this class to be a static, all things considered
 #TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
@@ -30,129 +32,146 @@ class Gui:
         self.has_saved = True
         self.report_filename = None
         self.exit = False
+        try:
+            self._context = dpg.create_context()
+            dpg.create_viewport(title='Video Bites', width=835, height=750, resizable = False)
 
-        self._context = dpg.create_context()
-        dpg.create_viewport(title='Video Bites', width=835, height=750, resizable = False)
+            dpg.add_texture_registry(show=False)          
 
-        dpg.add_texture_registry(show=False)
-            
-        with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, no_resize=True,show=False):
-            dpg.add_text(default_value='You have not saved this report.  Do you wish to quit without saving?')
-            with dpg.group(horizontal=True):
-                dpg.add_spacer(width=138)
-                dpg.add_button(label='Save', callback=Gui._cb_save_and_quit, user_data={'ctr':self})
-                dpg.add_button(label='Dont\'t Save', callback=Gui._cb_exit, user_data={'ctr':self})
-                dpg.add_button(label='Cancel', callback=Gui._cb_cancel_exit, user_data={'ctr':self})
+            with dpg.window(id='ModalErrorPopup', label='Error', modal=True, pos=(320,300), width=400, height=150, no_resize=True, show=False):
+                with dpg.group():
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=45)
+                        dpg.add_text(default_value='An error has occurred that has caused\n\t the application to crash.\n\nPlease contact support and send a copy\n\tof the most recent error logs.')
+                    dpg.add_spacer(height=15)
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=170)
+                        dpg.add_button(id='ConfirmErrorButton', label='Ok', callback=Gui._cb_close_error_popup, user_data={'ctr':self})
 
-        with dpg.window(id='ModalNewSetting', modal=True, width=515, height=200, no_resize=True,show=False):
-            with dpg.group():
-                dpg.add_text(default_value='Specify number of seconds for running average time window.')
+            with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, no_resize=True,show=False):
+                dpg.add_text(default_value='You have not saved this report.  Do you wish to quit without saving?')
                 with dpg.group(horizontal=True):
-                    dpg.add_text(default_value='Starting Frame:')
-                    dpg.add_input_int(id='NewSettingStartInput', width=100, min_value=0, default_value=1)
-                    dpg.add_spacer(width=6)
-                    dpg.add_text(id='StartErrorText', default_value='', color=(255,0,0,255))
-                with dpg.group(horizontal=True):
-                    dpg.add_text(default_value='Ending Frame:')
-                    dpg.add_spacer(width=6)
-                    dpg.add_input_int(id='NewSettingEndInput', width=100, min_value=0, max_value=59, default_value=1)
-                    dpg.add_spacer(width=6)
-                    dpg.add_text(id='EndErrorText', default_value='', color=(255,0,0,255))
-                dpg.add_spacer(height=10)
-                with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=100)
-                    dpg.add_text(id='NewSettingGeneralErrorText', default_value='', color=(255,0,0,255))
-                dpg.add_spacer(height=10)
-                with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=325)
-                    dpg.add_button(id='NewSettingConfirmBtn', width=70, label='Confirm', callback=Gui._cb_confirm_new_setting_modal, user_data={'ctr':self})
-                    dpg.add_button(width=70, label='Cancel', callback=Gui._cb_close_new_setting_modal, user_data={'ctr':self})
+                    dpg.add_spacer(width=138)
+                    dpg.add_button(label='Save', callback=Gui._cb_save_and_quit, user_data={'ctr':self})
+                    dpg.add_button(label='Dont\'t Save', callback=Gui._cb_exit, user_data={'ctr':self})
+                    dpg.add_button(label='Cancel', callback=Gui._cb_cancel_exit, user_data={'ctr':self})
 
-        with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19), no_close=True):
-            with dpg.menu_bar(label='MainMenuBar'):
-                with dpg.menu(label='File'):
-                    dpg.add_menu_item(label='Open', callback=Gui._cb_open, user_data={'ctr':self})
-                    dpg.add_menu_item(label='Save', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':False})
-                    dpg.add_menu_item(label='Save As...', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':True})
-                    dpg.add_menu_item(label='Exit', callback=Gui._cb_attempt_exit, user_data={'ctr':self, 'file-override':True})
-            with dpg.group():
-                with dpg.group(horizontal=True):
-                    with dpg.child_window(label='AnalysisSettings', width=(260), height=(350), border=False):
-                        with dpg.group(horizontal=True):
-                            dpg.add_spacer(width=5)
-                            dpg.add_text(id='AnalysisSettingsLabel', default_value='Analysis Settings')
-                            dpg.add_button(id='NewSettingBtn', callback=Gui._cb_add_setting, user_data={'ctr':self},label='+')
-                        with dpg.child_window(id='SettingsContainer', width=(230), height=(320), pos=(5, 30), no_scrollbar=False):
-                            pass
+            with dpg.window(id='ModalNewSetting', modal=True, width=515, height=200, no_resize=True,show=False):
+                with dpg.group():
+                    dpg.add_text(default_value='Specify number of seconds for running average time window.')
+                    with dpg.group(horizontal=True):
+                        dpg.add_text(default_value='Starting Frame:')
+                        dpg.add_input_int(id='NewSettingStartInput', width=100, min_value=0, default_value=1)
+                        dpg.add_spacer(width=6)
+                        dpg.add_text(id='StartErrorText', default_value='', color=(255,0,0,255))
+                    with dpg.group(horizontal=True):
+                        dpg.add_text(default_value='Ending Frame:')
+                        dpg.add_spacer(width=6)
+                        dpg.add_input_int(id='NewSettingEndInput', width=100, min_value=0, max_value=59, default_value=1)
+                        dpg.add_spacer(width=6)
+                        dpg.add_text(id='EndErrorText', default_value='', color=(255,0,0,255))
+                    dpg.add_spacer(height=10)
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=100)
+                        dpg.add_text(id='NewSettingGeneralErrorText', default_value='', color=(255,0,0,255))
+                    dpg.add_spacer(height=10)
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=325)
+                        dpg.add_button(id='NewSettingConfirmBtn', width=70, label='Confirm', callback=Gui._cb_confirm_new_setting_modal, user_data={'ctr':self})
+                        dpg.add_button(width=70, label='Cancel', callback=Gui._cb_close_new_setting_modal, user_data={'ctr':self})
 
-                    with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
-                        with dpg.group(horizontal=True):
-                            dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
-                            dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
-                        with dpg.child_window(id='VideoPreview', width=535, height=303, border=False):
-                            with dpg.drawlist(width=528, height=297, tag="DrawArea"):
-                                dpg.draw_rectangle(tag='test-rect',pmin=[0,0],pmax=[528,297], fill=[21,21,21], color=[21,21,21])
+            with dpg.window(id='MainWindow', width=950, height=750, no_title_bar=True, no_resize=True, no_move=True, pos=(0,19), no_close=True):
+                with dpg.menu_bar(label='MainMenuBar'):
+                    with dpg.menu(label='File'):
+                        dpg.add_menu_item(label='Open', callback=Gui._cb_open, user_data={'ctr':self})
+                        dpg.add_menu_item(label='Save', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':False})
+                        dpg.add_menu_item(label='Save As...', callback=Gui._cb_save, user_data={'ctr':self, 'file-override':True})
+                        dpg.add_menu_item(label='Exit', callback=Gui._cb_attempt_exit, user_data={'ctr':self, 'file-override':True})
+                with dpg.group():
+                    with dpg.group(horizontal=True):
+                        with dpg.child_window(label='AnalysisSettings', width=(260), height=(350), border=False):
+                            with dpg.group(horizontal=True):
+                                dpg.add_spacer(width=5)
+                                dpg.add_text(id='AnalysisSettingsLabel', default_value='Analysis Settings')
+                                dpg.add_button(id='NewSettingBtn', callback=Gui._cb_add_setting, user_data={'ctr':self},label='+')
+                            with dpg.child_window(id='SettingsContainer', width=(230), height=(320), pos=(5, 30), no_scrollbar=False):
+                                pass
 
-                        self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=529,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
-                        
-                dpg.add_spacer(height=10)
-                
-                with dpg.child_window(id='ResultGraphs', width=800, height=270, no_scrollbar=False):
-                    with dpg.tab_bar(id='GraphTabBar', reorderable=False, user_data={'ctr':self}):
-                        
-                        with dpg.tab(id='TotalCommentTab', label='Total Comments'):
-                            with dpg.plot(tag='TotalPlot', label='Total Comments Over Time', width=785, height=208):
-                                dpg.add_plot_legend()
-                                dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisTotal', lock_min=True)
-                                dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisTotal', lock_min=True)
-                                dpg.add_line_series(self._total_x_data, self._total_y_data, label='Total Comments', parent='YAxisTotal', tag='TotalSeries')
+                        with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
+                            with dpg.group(horizontal=True):
+                                dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
+                                dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
+                            with dpg.child_window(id='VideoPreview', width=535, height=303, border=False):
+                                with dpg.drawlist(width=528, height=297, tag="DrawArea"):
+                                    dpg.draw_rectangle(tag='test-rect',pmin=[0,0],pmax=[528,297], fill=[21,21,21], color=[21,21,21])
 
-                        with dpg.tab(id='BoxedCommentTab', label='Grouped Comments'):
-                            with dpg.group():
-                                with dpg.plot(tag='BoxedPlot', label='Comments per Window', width=785, height=208):
+                            self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=529,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
+                            
+                    dpg.add_spacer(height=10)
+                    
+                    with dpg.child_window(id='ResultGraphs', width=800, height=270, no_scrollbar=False):
+                        with dpg.tab_bar(id='GraphTabBar', reorderable=False, user_data={'ctr':self}):
+                            
+                            with dpg.tab(id='TotalCommentTab', label='Total Comments'):
+                                with dpg.plot(tag='TotalPlot', label='Total Comments Over Time', width=785, height=208):
                                     dpg.add_plot_legend()
-                                    dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisBoxed', lock_min=True)
-                                    dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisBoxed', lock_min=True)
-                                    dpg.add_bar_series(self._boxed_x_data, self._boxed_y_data, label='Comments in 5.0 Second Window', parent='YAxisBoxed', tag='BoxedSeries')
-                                with dpg.group(horizontal=True):
-                                    dpg.add_input_int(tag='WindowSizeInput',width = 130, default_value=300,min_value=1, min_clamped=True)
-                                    dpg.add_text(default_value='Window Size (frames)')
+                                    dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisTotal', lock_min=True)
+                                    dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisTotal', lock_min=True)
+                                    dpg.add_line_series(self._total_x_data, self._total_y_data, label='Total Comments', parent='YAxisTotal', tag='TotalSeries')
 
-                        with dpg.tab(id='ScoredCommentTab', label='Engagement Scores'):
-                            with dpg.group():
-                                with dpg.plot(tag='ScoredPlot', label='Engagement Score Over Time', width=785, height=208):
-                                    dpg.add_plot_legend()
-                                    dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisScored', lock_min=True)
-                                    dpg.add_plot_axis(dpg.mvYAxis, label='Engagement Score', tag='YAxisScored', lock_min=True)
-                                    dpg.add_line_series(self._scored_x_data, self._scored_y_data, label='Engagement Score Over Time', parent='YAxisScored', tag='ScoredSeries')
+                            with dpg.tab(id='BoxedCommentTab', label='Grouped Comments'):
                                 with dpg.group():
+                                    with dpg.plot(tag='BoxedPlot', label='Comments per Window', width=785, height=208):
+                                        dpg.add_plot_legend()
+                                        dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisBoxed', lock_min=True)
+                                        dpg.add_plot_axis(dpg.mvYAxis, label='Total Number of Comments', tag='YAxisBoxed', lock_min=True)
+                                        dpg.add_bar_series(self._boxed_x_data, self._boxed_y_data, label='Comments in 5.0 Second Window', parent='YAxisBoxed', tag='BoxedSeries')
                                     with dpg.group(horizontal=True):
-                                        dpg.add_input_float(tag='PointValueInput', width = 130, default_value=2.0,step=1, min_value=0, min_clamped=True)
-                                        dpg.add_text(default_value='Point Value')
-                                        dpg.add_spacer(width=80)
-                                        dpg.add_input_float(tag='DecayRateInput', width = 130, default_value=0.002,step=0.001, min_value=0, min_clamped=True)
-                                        dpg.add_text(default_value='Decay Rate (per frame)')
+                                        dpg.add_input_int(tag='WindowSizeInput',width = 130, default_value=300,min_value=1, min_clamped=True)
+                                        dpg.add_text(default_value='Window Size (frames)')
 
-                dpg.add_spacer(height=3)
-                with dpg.group(horizontal=True):
-                    dpg.add_spacer(width=656, show=True)
-                    with dpg.group():
-                        dpg.add_button(id='RunAnalysisBtn', label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self}, enabled=False)
-                    dpg.add_loading_indicator(id='LoadingIcon', style=1, radius=1.8, show=False)
+                            with dpg.tab(id='ScoredCommentTab', label='Engagement Scores'):
+                                with dpg.group():
+                                    with dpg.plot(tag='ScoredPlot', label='Engagement Score Over Time', width=785, height=208):
+                                        dpg.add_plot_legend()
+                                        dpg.add_plot_axis(dpg.mvXAxis, label='Frame Number', tag='XAxisScored', lock_min=True)
+                                        dpg.add_plot_axis(dpg.mvYAxis, label='Engagement Score', tag='YAxisScored', lock_min=True)
+                                        dpg.add_line_series(self._scored_x_data, self._scored_y_data, label='Engagement Score Over Time', parent='YAxisScored', tag='ScoredSeries')
+                                    with dpg.group():
+                                        with dpg.group(horizontal=True):
+                                            dpg.add_input_float(tag='PointValueInput', width = 130, default_value=2.0,step=1, min_value=0, min_clamped=True)
+                                            dpg.add_text(default_value='Point Value')
+                                            dpg.add_spacer(width=80)
+                                            dpg.add_input_float(tag='DecayRateInput', width = 130, default_value=0.002,step=0.001, min_value=0, min_clamped=True)
+                                            dpg.add_text(default_value='Decay Rate (per frame)')
 
-        dpg.set_primary_window('MainWindow', True)
+                    dpg.add_spacer(height=3)
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=656, show=True)
+                        with dpg.group():
+                            dpg.add_button(id='RunAnalysisBtn', label='Begin Analysis',callback=Gui._cb_run_analysis, user_data={'ctr':self}, enabled=False)
+                        dpg.add_loading_indicator(id='LoadingIcon', style=1, radius=1.8, show=False)
 
-        dpg.setup_dearpygui()
-        dpg.show_viewport()
+            dpg.set_primary_window('MainWindow', True)
 
-        while self.exit != True and dpg.is_dearpygui_running() :
-            tmp = dpg.get_value('VideoPosSlider')
-            if(self._update_frame == True):
-                self._refresh_preview_frame()
-            dpg.render_dearpygui_frame()
+            dpg.setup_dearpygui()
+            dpg.show_viewport()
+        
+            while self.exit != True and dpg.is_dearpygui_running() :
+                tmp = dpg.get_value('VideoPosSlider')
+                if(self._update_frame == True):
+                    self._refresh_preview_frame()
+                dpg.render_dearpygui_frame()
+        except SystemError as e:
+            LogManager.write_error_log(e)
+        finally:
+            dpg.destroy_context()
 
-        dpg.destroy_context()
-        pass
+    def _cb_close_error_popup(sender, app_data, user_data):
+        dpg.configure_item('ModalErrorPopup', show=False)
+        user_data['ctr'].exit = True
+        
+
 
     def _cb_cancel_exit(sender, app_data, user_data):
         dpg.configure_item('ModalConfirmExit', show=False)
@@ -208,84 +227,90 @@ class Gui:
             return False
     
     def _cb_open(sender, app_data, user_data):
-        controller = user_data['ctr']
-        accepted_filetypes = [ ('Video Bites Report file', '*.g8r') ]
-        report_filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
-        
-        if(report_filepath != None and report_filepath != ''):
-            Gui._clear_fields(controller)
-            file = open(report_filepath)
-            data = json.load(file)
-            converted_tuples = []
-            for json_array in data['frame_windows']:
-                converted_tuples.append((json_array[0], json_array[1]))
+        try:
+            controller = user_data['ctr']
+            accepted_filetypes = [ ('Video Bites Report file', '*.g8r') ]
+            report_filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
+            
+            if(report_filepath != None and report_filepath != ''):
+                Gui._clear_fields(controller)
+                file = open(report_filepath)
+                data = json.load(file)
+                converted_tuples = []
+                for json_array in data['frame_windows']:
+                    converted_tuples.append((json_array[0], json_array[1]))
 
-            for current_window in data['frame_windows']:
-                start_frame = current_window[0]
-                end_frame = current_window[1]
-                text = f"{start_frame}-{end_frame}"
-                with dpg.group(parent='SettingsContainer', horizontal=True):
-                    controller._setting_ranges.append((start_frame, end_frame))
-                    label = dpg.add_text(default_value=text)
-                    edit_btn = dpg.add_button()
-                    del_btn = dpg.add_button()
-                    dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
-                        user_data={
-                            'ctr':user_data['ctr'],
-                            'edit-tgt':label,
-                            'range':(current_window[0], current_window[1]),
-                            'label':label,
-                            'edit-btn':edit_btn,
-                            'del-btn':del_btn
-                        }
+                for current_window in data['frame_windows']:
+                    start_frame = current_window[0]
+                    end_frame = current_window[1]
+                    text = f"{start_frame}-{end_frame}"
+                    with dpg.group(parent='SettingsContainer', horizontal=True):
+                        controller._setting_ranges.append((start_frame, end_frame))
+                        label = dpg.add_text(default_value=text)
+                        edit_btn = dpg.add_button()
+                        del_btn = dpg.add_button()
+                        dpg.configure_item(edit_btn, label='Edit', callback=Gui._cb_add_setting,
+                            user_data={
+                                'ctr':user_data['ctr'],
+                                'edit-tgt':label,
+                                'range':(current_window[0], current_window[1]),
+                                'label':label,
+                                'edit-btn':edit_btn,
+                                'del-btn':del_btn
+                            }
+                        )
+                        dpg.configure_item(del_btn,label='Delete', callback=Gui._cb_delete_setting_button,
+                            user_data={
+                                'ctr':user_data['ctr'],
+                                'self':dpg.get_item_parent(label),
+                                'range':current_window
+                            }
+                        )
+                controller.has_saved = True
+                src_filepath = data['src_file']
+            
+                if (src_filepath != None and src_filepath != ''):
+                    analyzer = controller._analyzer
+                    if(controller._video != None):
+                        controller._video.release()
+                    
+                    analyzer.set_filepath(src_filepath)
+                    dpg.set_value('TgtFilepath', src_filepath)
+                    dpg.delete_item('VideoPosSlider')
+                    controller._video = cv2.VideoCapture(src_filepath)
+                    num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
+                    Gui._change_preview_frame(controller._video, 0)
+                    controller._current_frame = 0
+                    dpg.add_slider_int(
+                        id='VideoPosSlider',
+                        parent='PreviewSection',
+                        min_value=1,
+                        max_value=num_frames,
+                        default_value=1,
+                        width=529,
+                        enabled=True,
+                        callback=Gui._cb_frame_slider,
+                        user_data={'ctr':controller}
                     )
-                    dpg.configure_item(del_btn,label='Delete', callback=Gui._cb_delete_setting_button,
-                        user_data={
-                            'ctr':user_data['ctr'],
-                            'self':dpg.get_item_parent(label),
-                            'range':current_window
-                        }
-                    )
-            controller.has_saved = True
 
-            src_filepath = data['src_file']
-        
-            if (src_filepath != None and src_filepath != ''):
-                analyzer = controller._analyzer
-                if(controller._video != None):
-                    controller._video.release()
-                
-                analyzer.set_filepath(src_filepath)
-                dpg.set_value('TgtFilepath', src_filepath)
-                dpg.delete_item('VideoPosSlider')
-                controller._video = cv2.VideoCapture(src_filepath)
-                num_frames = int(controller._video.get(cv2.CAP_PROP_FRAME_COUNT))
-                Gui._change_preview_frame(controller._video, 0)
-                controller._current_frame = 0
-                dpg.add_slider_int(
-                    id='VideoPosSlider',
-                    parent='PreviewSection',
-                    min_value=1,
-                    max_value=num_frames,
-                    default_value=1,
-                    width=529,
-                    enabled=True,
-                    callback=Gui._cb_frame_slider,
-                    user_data={'ctr':controller}
-                )
+                dpg.set_value('WindowSizeInput', data['window_size'])
+                dpg.set_value('PointValueInput', data['point_value'])
+                dpg.set_value('DecayRateInput', data['decay_rate'])
+                for raw_result in data['raw_report_results']:
+                    is_result_true = raw_result[2] == 1
+                    controller._raw_report_results.append((raw_result[0], raw_result[1], is_result_true))
+                controller._frame_count = data['frame_count']
+                controller._fps = data['fps']
+                if (len(controller._raw_report_results) > 0):
+                    controller._process_raw_results()
 
-            dpg.set_value('WindowSizeInput', data['window_size'])
-            dpg.set_value('PointValueInput', data['point_value'])
-            dpg.set_value('DecayRateInput', data['decay_rate'])
-            for raw_result in data['raw_report_results']:
-                is_result_true = raw_result[2] == 1
-                controller._raw_report_results.append((raw_result[0], raw_result[1], is_result_true))
-            controller._frame_count = data['frame_count']
-            controller._fps = data['fps']
-            if (len(controller._raw_report_results) > 0):
-                controller._process_raw_results()
-
-            dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+                dpg.configure_item('RunAnalysisBtn', enabled=Gui._check_analysis_prereqs(user_data['ctr']))
+        except Exception as e:
+            LogManager.write_error_log(e)
+            dpg.configure_item('ModalErrorPopup', show=True)
+        except SystemError as e:
+            LogManager.write_error_log(e)
+            dpg.configure_item('ModalErrorPopup', show=True)
             
     def _cb_attempt_exit(sender, app_data, user_data):
         if(user_data['ctr'].has_saved != True):
