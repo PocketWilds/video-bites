@@ -99,7 +99,7 @@ class Gui:
 
                         with dpg.child_window(id='PreviewSection', width=(622), height=(350), no_scrollbar=False, border=False):
                             with dpg.group(horizontal=True):
-                                dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
+                                dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'ctr':self})
                                 dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
                             with dpg.child_window(id='VideoPreview', width=535, height=303, border=False):
                                 with dpg.drawlist(width=528, height=297, tag="DrawArea"):
@@ -459,8 +459,7 @@ class Gui:
         filepath = filedialog.askopenfilename(initialdir=os.getcwd(), filetypes=accepted_filetypes)
         
         if (filepath != None and filepath != ''):
-            analyzer = user_data['analyzer']
-            controller = user_data['ctr']
+            analyzer = controller._analyzer
             if(controller._video != None):
                 controller._video.release()
             
