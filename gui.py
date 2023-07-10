@@ -6,7 +6,6 @@ import numpy as np
 from tkinter import filedialog
 from video_analyzer import VideoAnalyzer
 from config_report_file import SaveFile
-import random
 
 #TODO Probably ought to refactor this class to be a static, all things considered
 #TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
@@ -35,13 +34,8 @@ class Gui:
 
         self._context = dpg.create_context()
         dpg.create_viewport(title='Video Bites', width=835, height=750, resizable = False)
-        width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
 
-        with dpg.texture_registry(show=False):
-            width, height, channels, data = dpg.load_image('./vid-preview-bg.png')
-            dpg.add_raw_texture(width=width, height=height, default_value=data, id='vid-preview-bg')
-            width, height, channels, data = dpg.load_image('./results-bg.png')
-            dpg.add_raw_texture(width=width, height=height, default_value=data, id='results-bg')
+        dpg.add_texture_registry(show=False)
             
         with dpg.window(id='ModalConfirmExit',label='Save Report?', modal=True, width=515, height=100, no_resize=True,show=False):
             dpg.add_text(default_value='You have not saved this report.  Do you wish to quit without saving?')
@@ -96,9 +90,10 @@ class Gui:
                         with dpg.group(horizontal=True):
                             dpg.add_button(id='SrcBtn', label='Source...', callback=Gui._cb_choose_src_vid, user_data={'analyzer':self._analyzer,'ctr':self})
                             dpg.add_text(id='TgtFilepath', default_value='mp4 file not yet chosen')
-                        
-                        with dpg.child_window(id='VideoPreview', width=529, height=298, border=False):
-                            dpg.add_image('vid-preview-bg')
+                        with dpg.child_window(id='VideoPreview', width=535, height=303, border=False):
+                            with dpg.drawlist(width=528, height=297, tag="DrawArea"):
+                                dpg.draw_rectangle(tag='test-rect',pmin=[0,0],pmax=[528,297], fill=[21,21,21], color=[21,21,21])
+
                         self._slider = dpg.add_slider_int(id='VideoPosSlider', min_value=0, max_value=0, width=529,enabled=True, callback=Gui._cb_frame_slider, user_data={'ctr':self})
                         
                 dpg.add_spacer(height=10)
@@ -225,7 +220,6 @@ class Gui:
             converted_tuples = []
             for json_array in data['frame_windows']:
                 converted_tuples.append((json_array[0], json_array[1]))
-            #save_file = SaveFile(data['src_file'], converted_tuples, data['target_windows'], data['analysis_results'])
 
             for current_window in data['frame_windows']:
                 start_frame = current_window[0]
@@ -474,7 +468,6 @@ class Gui:
         dpg.configure_item('NewSettingBtn', enabled=False)
         dpg.configure_item('SrcBtn', enabled=False)
         frame_ranges = controller._setting_ranges
-        #running_average_windows = controller._target_windows
         controller._raw_report_results, controller._frame_count, controller._fps = controller._analyzer.run_analysis(frame_ranges)
                 
         controller._process_raw_results()
@@ -554,8 +547,10 @@ class Gui:
         video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number - 1)
         frame = video_capture.read()[1]
         shape = frame.shape
-        scaled_h = int(shape[0] * 0.275)
-        scaled_w = int(shape[1] * 0.275)
+
+        scaled_h = 297
+        scaled_w = 528
+
         preview_frame = cv2.resize(frame, dsize=(scaled_w, scaled_h), interpolation=cv2.INTER_CUBIC)
         return preview_frame
 

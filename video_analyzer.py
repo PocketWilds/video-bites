@@ -1,7 +1,7 @@
-import bisect
+#import bisect
 import cv2
-import threading
-import queue
+#import threading
+#import queue
 import numpy as np
 from PIL import Image
 
@@ -28,7 +28,6 @@ class VideoAnalyzer:
             self._video = cv2.VideoCapture(self.filepath)
         
         raw_results, frame_count, fps = self._get_raw_video_analysis(frame_ranges)
-        #meta_results = self._get_meta_analysis(average_windows, raw_results, int(frame_count), fps)
         return raw_results, frame_count, fps
 
     def _get_raw_video_analysis(self, frame_ranges, scale_factor=1.0, monitored_section=(1638, 70, 1852, 570)):
@@ -41,7 +40,6 @@ class VideoAnalyzer:
             for i in range(frame_range[0] - 1, frame_range[1]):
                 read_result, frame = self._video.read()
                 if read_result:
-                    #current_frame = self._video.get(cv2.CAP_PROP_POS_FRAMES)
                     src_img = Image.fromarray(frame)
                     crop = src_img.crop(monitored_section)
                     frame = np.asarray(crop)
@@ -75,39 +73,6 @@ class VideoAnalyzer:
 
         return frame_comparisons, self._video.get(cv2.CAP_PROP_FRAME_COUNT), self._video.get(cv2.CAP_PROP_FPS)
     
-    def _get_meta_analysis(self, average_windows, raw_results, frame_count, fps):
-        meta_results = {}
-        for window in average_windows:
-            meta_results[window] = {}
-
-        triggers = list(filter(lambda x:x[2] == True, raw_results))
-        total_triggers = len(triggers)
-
-        for trigger in triggers:
-            for window in average_windows:
-                range_diff = int(fps * window / 2)
-                min_frame_range = max(int(trigger[0]) - range_diff, 1)
-                max_frame_range = min(int(trigger[0]) + range_diff, frame_count)
-                for i in range(min_frame_range, max_frame_range):
-                    if (meta_results[window].get(i) == None):
-                        meta_results[window][i] = 1.0
-                    else:
-                        meta_results[window][i] += 1.0
-
-        vid_len_sec = frame_count / fps
-        trigger_per_sec = total_triggers / vid_len_sec
-        prepared_results = {}
-        for results_key in meta_results:
-            completed_set = []
-            for i in range(1, frame_count):
-                if (meta_results[results_key].get(i) == None):
-                    completed_set.append(0.0)
-                else:
-                    completed_set.append(meta_results[results_key][i])
-            prepared_results[results_key] = completed_set
-        
-        return prepared_results
-
     def mse(imageA, imageB):
         err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
         err /= float(imageA.shape[0] * imageA.shape[1])
