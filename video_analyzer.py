@@ -59,8 +59,6 @@ class VideoAnalyzer:
                         has_new_msg = mse_result > 11000.0 and isnt_locked
                         if(has_new_msg):
                             next_available_trigger = i + 19
-                        frame_comparisons.append((i, mse_result, has_new_msg))
-                    #cv2.imwrite(name, scaledFrame)
                     past_frame = frame
                 else:
                     break
