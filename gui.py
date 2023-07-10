@@ -142,7 +142,7 @@ class Gui:
                                             dpg.add_input_float(tag='PointValueInput', width = 130, default_value=2.0,step=1, min_value=0, min_clamped=True)
                                             dpg.add_text(default_value='Point Value')
                                             dpg.add_spacer(width=80)
-                                            dpg.add_input_float(tag='DecayRateInput', width = 130, default_value=0.002,step=0.0001, min_value=0, min_clamped=True)
+                                            dpg.add_input_float(tag='DecayRateInput', width = 130, default_value=0.002,step=0.001, min_value=0, min_clamped=True)
                                             dpg.add_text(default_value='Decay Rate (per frame)')
 
                     dpg.add_spacer(height=3)
@@ -543,7 +543,7 @@ class Gui:
 
         score = 0
         for i in range(int(self._frame_count)):
-            score = max(score - point_decay_rate, 0)
+            score = max(score - point_decay_rate * 10, 0)
             if i in frame_triggers:
                 score += point_score
             self._scored_x_data.append(i)
