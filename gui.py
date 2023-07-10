@@ -543,7 +543,7 @@ class Gui:
 
         score = 0
         for i in range(int(self._frame_count)):
-            score = max(score - point_decay_rate * 10, 0)
+            score = max(score - point_decay_rate / 10, 0)
             if i in frame_triggers:
                 score += point_score
             self._scored_x_data.append(i)
