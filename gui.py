@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 from tkinter import filedialog
 from video_analyzer import VideoAnalyzer
-from config_report_file import SaveFile
 
 #TODO Probably ought to refactor this class to be a static, all things considered
 #TODO Maybe implement an auto sort feature to the frame window settings to sort by chronological order
